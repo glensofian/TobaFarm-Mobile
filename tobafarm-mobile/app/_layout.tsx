@@ -1,25 +1,32 @@
-import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { Stack } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
-import 'react-native-reanimated';
-import '../global.css';
+import { useFonts } from 'expo-font';
+import { View, ActivityIndicator } from 'react-native';
 
-import { useColorScheme } from '@/hooks/use-color-scheme';
+export default function Layout() {
+  // Load font aplikasi
+  const [loaded] = useFonts({
+    'Montserrat-SemiBold': require('../assets/fonts/static/Montserrat-SemiBold.ttf'),
+    'Montserrat-Italic': require('../assets/fonts/static/Montserrat-Italic.ttf'),
+    'Montserrat-Medium': require('../assets/fonts/static/Montserrat-Medium.ttf'),
+    'Montserrat-Regular': require('../assets/fonts/static/Montserrat-Regular.ttf'),
+  });
 
-export const unstable_settings = {
-  anchor: '(tabs)',
-};
+  // Tampilkan loading global saat font belum siap
+  if (!loaded) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator size="large" />
+      </View>
+    );
+  }
 
-export default function RootLayout() {
-  const colorScheme = useColorScheme();
-
+  // Root navigation untuk seluruh halaman aplikasi
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <Stack>
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
-      </Stack>
-      <StatusBar style="auto" />
-    </ThemeProvider>
+    <Stack
+      screenOptions={{
+        headerShown: false,
+        animation: 'slide_from_right',
+      }}
+    />
   );
 }

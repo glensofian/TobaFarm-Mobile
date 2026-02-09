@@ -8,6 +8,9 @@ This is an [Expo](https://expo.dev) project created with [`create-expo-app`](htt
 
    ```bash
    npm install
+   npm install nativewind
+   npx expo install @expo/vector-icons
+   npx expo install expo-font
    ```
 
 2. Start the app
