@@ -53,6 +53,7 @@ export const ComponentStyles = StyleSheet.create({
     borderColor: Colors.borderInput,
     borderRadius: 25,
     paddingHorizontal: 16,
+    paddingVertical: 6,
     height: 44,
     marginBottom: 16,
   },
@@ -118,85 +119,87 @@ export const ComponentStyles = StyleSheet.create({
     paddingVertical: 10,
   },
 
- /* ===== SIDEBAR ===== */
-sidebarOverlay: {
-  position: 'absolute',
-  top: 0,
-  left: 0,
-  right: 0,
-  bottom: 0,
-  flexDirection: 'row',
-  zIndex: 999,
-  elevation: 30,
-},
+  /* ===== SIDEBAR ===== */
+  sidebarOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    flexDirection: 'row',
+    zIndex: 999,
+    elevation: 30,
+  },
 
-sidebarBackdrop: {
-  flex: 1,
-  backgroundColor: 'rgba(0,0,0,0.25)',
-},
+  sidebarBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.25)',
+  },
 
-sidebarContainer: {
-  width: '78%',
-  backgroundColor: '#F2F2F2',
-},
+  sidebarContainer: {
+    width: '78%',
+    backgroundColor: '#F2F2F2',
+  },
 
-sidebarHeader: {
-  height: 52,
-  flexDirection: 'row',
-  alignItems: 'center',
-  justifyContent: 'space-between',
-  paddingHorizontal: 16,
-},
+  sidebarHeader: {
+    height: 52,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+  },
 
-sidebarNewChat: {
-  flexDirection: 'row',
-  alignItems: 'center',
-  paddingHorizontal: 16,
-  paddingVertical: 10,
-  gap: 10,
-},
+  sidebarNewChat: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    gap: 10,
+  },
 
-sidebarItem: {
-  paddingHorizontal: 16,
-  paddingVertical: 10,
-},
+  sidebarItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+  },
 
-sidebarItemActive: {
-  backgroundColor: '#E0E0E0',
-  borderRadius: 8,
-  marginHorizontal: 8,
-},
+  sidebarItemActive: {
+    backgroundColor: '#E0E0E0',
+    borderRadius: 8,
+    marginHorizontal: 8,
+  },
 
-sidebarFooter: {
-  paddingHorizontal: 16,
-  paddingTop: 12,
-  paddingBottom: 14,
-},
+  sidebarFooter: {
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 14,
+  },
 
-sidebarFooterCard: {
-  flexDirection: 'row',
-  alignItems: 'center',
-  justifyContent: 'space-between',
-  backgroundColor: '#D9D9D9',
-  borderRadius: 12,
-  paddingHorizontal: 12,
-  paddingVertical: 8,
-  width: '100%',
-},
+  sidebarFooterCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#D9D9D9',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    width: '100%',
+  },
 
-sidebarAvatar: {
-  width: 32,
-  height: 32,
-  borderRadius: 16,
+  sidebarAvatar: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
 
-  borderWidth: 1.5,
-  borderColor: Colors.black,
+    borderWidth: 1.5,
+    borderColor: Colors.black,
 
-  alignItems: 'center',
-  justifyContent: 'center',
+    alignItems: 'center',
+    justifyContent: 'center',
 
-  marginRight: 10,
-},
+    marginRight: 10,
+  },
 
 
 });
@@ -206,6 +209,7 @@ export const ComponentTextStyles = StyleSheet.create({
   chatInputText: {
     flex: 1,
     color: Colors.black,
+    paddingVertical: 6,
   },
 
   /* ===== LOGIN / REGISTER ===== */
@@ -213,6 +217,7 @@ export const ComponentTextStyles = StyleSheet.create({
     fontFamily: "Montserrat-SemiBold",
     fontSize: 13,
     marginBottom: 6,
+    paddingVertical: 6,
   },
 
   registerText: {
@@ -220,6 +225,7 @@ export const ComponentTextStyles = StyleSheet.create({
     fontSize: 12,
     textAlign: "center",
     marginBottom: 16,
+    paddingVertical: 6,
   },
 
   registerHighlight: {
@@ -227,9 +233,17 @@ export const ComponentTextStyles = StyleSheet.create({
     color: Colors.accentPrimary,
   },
 
+  registerErrorText: {
+    color: "red",
+    fontFamily: "Montserrat-Regular",
+    fontSize: 12,
+    textAlign: "center",
+    marginBottom: 0,
+  },
   loginSubmitText: {
     color: Colors.white,
     fontFamily: "Montserrat-SemiBold",
+    paddingVertical: 6,
   },
 
   /* ===== OTP ===== */
@@ -250,30 +264,49 @@ export const ComponentTextStyles = StyleSheet.create({
     color: Colors.black,
   },
 
+  sidebarAvatarText: {
+    fontFamily: "Montserrat-Medium",
+    color: Colors.black,
+  },
+
   sidebarNewChatText: {
-  fontFamily: 'Montserrat-Medium',
-  fontSize: 14,
-  color: Colors.black,
-},
+    fontFamily: 'Montserrat-Medium',
+    fontSize: 14,
+    color: Colors.black,
+  },
 
-sidebarSectionTitle: {
-  fontFamily: 'Montserrat-SemiBold',
-  fontSize: 12,
-  color: '#555',
-  paddingHorizontal: 16,
-  marginVertical: 12,
-},
+  sidebarSectionTitle: {
+    fontFamily: 'Montserrat-SemiBold',
+    fontSize: 12,
+    color: '#555',
+    paddingHorizontal: 16,
+    marginVertical: 12,
+  },
 
-sidebarItemText: {
-  fontFamily: 'Montserrat-Regular',
-  fontSize: 13,
-  color: Colors.black,
-},
+  sidebarItemText: {
+    flex: 1,
+    fontFamily: 'Montserrat-Regular',
+    fontSize: 13,
+    color: Colors.black,
+  },
 
-sidebarFooterText: {
-  fontFamily: 'Montserrat-Medium',
-  fontSize: 13,
-  color: Colors.black,
-},
+  sidebarItemRenameText: {
+    flex: 1,
+    fontFamily: 'Montserrat-Regular',
+    fontSize: 13,
+    color: Colors.black,
+    backgroundColor: '#EEE',
+    borderRadius: 4,
+    paddingHorizontal: 4,
+    paddingVertical: 6,
+  },
+
+  sidebarFooterText: {
+    fontFamily: 'Montserrat-Medium',
+    fontSize: 13,
+    color: Colors.black,
+  },
+
+
 
 });

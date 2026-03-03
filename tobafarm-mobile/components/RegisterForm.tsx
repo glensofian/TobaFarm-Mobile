@@ -3,23 +3,111 @@ import { Ionicons } from '@expo/vector-icons';
 import { useState } from 'react';
 import { useRouter } from 'expo-router';
 import { ComponentStyles, ComponentTextStyles } from '../styles';
+import { RegisterUser } from '@/types/user';
+import axios from 'axios';
+import { OTPCreate } from '@/types/otp';
 
 export default function RegisterForm() {
   const router = useRouter();
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [loading, setLoading] = useState(false);
+
+
+  const [error, setError] = useState<string | null>(null);
+
+  const onSubmit = async () => {
+    setError(null);
+
+    const un = username.trim();
+    const em = email.trim();
+    const pw = password.trim();
+    const cf = confirm.trim();
+
+    if (!un || !em || !pw || !cf) {
+      setError("Semua field wajib diisi.");
+      return;
+    }
+
+    if (un.length < 6) {
+      setError("Username minimal 6 karakter.");
+      return;
+    }
+
+    if (un.includes(" ")) {
+      setError("Username tidak boleh mengandung spasi.");
+      return;
+    }
+
+    if (!em.includes("@")) {
+      setError("Email tidak valid.");
+      return;
+    }
+
+    if (pw.length < 6) {
+      setError("Password minimal 6 karakter.");
+      return;
+    }
+
+    if (pw !== cf) {
+      setError("Konfirmasi password tidak sama.");
+      return;
+    }
+
+    const payload: RegisterUser = {
+      username: un,
+      email: em,
+      password: pw,
+      role: "user"
+    }
+
+    try {
+      setLoading(true);
+
+
+      const response = await axios.post(
+        `${process.env.EXPO_PUBLIC_TOFA_API_URL}/auth/register`,
+        payload
+      );
+
+      if (response.status !== 200) {
+        setError("Registrasi gagal. Silakan coba lagi.");
+        return;
+      }
+
+      await new Promise((r) => setTimeout(r, 600));
+
+      router.push({
+        pathname: "/otp",
+        params: { email: em, user_id: response.data.user_id } as OTPCreate
+      });
+    } catch {
+      setError("Registrasi gagal. Silakan coba lagi.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <View style={ComponentStyles.loginCard}>
       {/* USERNAME */}
+      {error && (
+        <Text style={ComponentTextStyles.registerErrorText}>
+          {error}
+        </Text>
+      )}
       <Text style={ComponentTextStyles.loginLabel}>Username :</Text>
-      <TextInput style={ComponentStyles.loginInput} />
+      <TextInput style={ComponentStyles.loginInput} value={username} onChangeText={setUsername} />
 
-      {/* EMAIL */}
+      {/* EMAIL */} 
       <Text style={ComponentTextStyles.loginLabel}>
-        Email / No. Telp :
+        Email:
       </Text>
-      <TextInput style={ComponentStyles.loginInput} />
+      <TextInput style={ComponentStyles.loginInput} value={email} onChangeText={setEmail} />
 
       {/* PASSWORD */}
       <Text style={ComponentTextStyles.loginLabel}>Password :</Text>
@@ -27,6 +115,8 @@ export default function RegisterForm() {
         <TextInput
           secureTextEntry={!showPassword}
           style={ComponentStyles.passwordInput}
+          value={password}
+          onChangeText={setPassword}
         />
         <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
           <Ionicons
@@ -45,6 +135,8 @@ export default function RegisterForm() {
         <TextInput
           secureTextEntry={!showConfirmPassword}
           style={ComponentStyles.passwordInput}
+          value={confirm}
+          onChangeText={setConfirm}
         />
         <TouchableOpacity
           onPress={() =>
@@ -78,11 +170,12 @@ export default function RegisterForm() {
       {/* SUBMIT */}
       <TouchableOpacity 
       style={ComponentStyles.loginSubmitButton}
-      onPress={() => router.push('/otp')}
+      onPress={onSubmit}
+      disabled={loading}
       >
         <Text 
           style={ComponentTextStyles.loginSubmitText}>
-          Sign Up
+          {loading ? 'Loading...' : 'Sign Up'}
         </Text>
       </TouchableOpacity>
     </View>
