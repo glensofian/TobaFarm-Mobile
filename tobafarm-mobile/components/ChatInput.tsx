@@ -1,4 +1,4 @@
-import { View, TextInput, TouchableOpacity } from 'react-native';
+import { View, TextInput, TouchableOpacity, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useState } from 'react';
 import {
@@ -6,16 +6,23 @@ import {
   ComponentTextStyles,
   Colors,
 } from '../styles';
+import { useNetwork } from '@/context/NetworkContext';
 
 type Props = {
   onSend?: (text: string) => void;
+  model?: string;
 };
 
-export default function ChatInput({ onSend }: Props) {
+export default function ChatInput({ onSend, model }: Props) {
   const [value, setValue] = useState('');
+  const { isInternetReachable, isConnected } = useNetwork();
 
   const handleSend = () => {
     if (!value.trim()) return;
+    if (model !== 'tofa-offline' && (!isInternetReachable || !isConnected)) {
+      Alert.alert('No Internet', 'Please check your internet connection');
+      return;
+    }
     onSend?.(value);
     setValue('');
   };

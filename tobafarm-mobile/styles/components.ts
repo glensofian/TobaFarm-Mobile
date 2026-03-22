@@ -201,7 +201,80 @@ export const ComponentStyles = StyleSheet.create({
     marginRight: 10,
   },
 
+  /* ===== MODAL ===== */
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
 
+  modalContent: {
+    width: '100%',
+    backgroundColor: Colors.white,
+    borderRadius: 24,
+    padding: 24,
+    alignItems: 'center',
+    elevation: 8,
+    shadowColor: Colors.black,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+  },
+
+  modalIconContainer: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: '#F0F4F8',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+
+  modalButtonGroup: {
+    flexDirection: 'row',
+    width: '100%',
+    gap: 12,
+    marginTop: 24,
+  },
+
+  modalButton: {
+    flex: 1,
+    height: 48,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+  },
+
+  modalButtonPrimary: {
+    backgroundColor: Colors.buttonPrimary,
+    borderColor: Colors.buttonPrimary,
+  },
+
+  modalButtonSecondary: {
+    backgroundColor: Colors.white,
+    borderColor: Colors.borderInput,
+  },
+
+  /* ===== PROGRESS BAR ===== */
+  modalProgressBar: {
+    width: '100%',
+    height: 8,
+    backgroundColor: '#F0F4F8',
+    borderRadius: 4,
+    overflow: 'hidden',
+    marginTop: 20,
+    marginBottom: 8,
+  },
+
+  modalProgressBarFill: {
+    height: '100%',
+    backgroundColor: Colors.buttonPrimary,
+    borderRadius: 4,
+  },
 });
 
 export const ComponentTextStyles = StyleSheet.create({
@@ -307,6 +380,32 @@ export const ComponentTextStyles = StyleSheet.create({
     color: Colors.black,
   },
 
+  /* ===== MODAL TEXT ===== */
+  modalTitle: {
+    fontFamily: 'Montserrat-Bold',
+    fontSize: 20,
+    color: Colors.black,
+    marginBottom: 8,
+    textAlign: 'center',
+  },
 
+  modalDescription: {
+    fontFamily: 'Montserrat-Regular',
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'center',
+    lineHeight: 20,
+  },
 
+  modalButtonTextPrimary: {
+    fontFamily: 'Montserrat-SemiBold',
+    fontSize: 15,
+    color: Colors.white,
+  },
+
+  modalButtonTextSecondary: {
+    fontFamily: 'Montserrat-SemiBold',
+    fontSize: 15,
+    color: Colors.black,
+  },
 });

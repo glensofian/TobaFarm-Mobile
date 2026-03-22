@@ -1,7 +1,26 @@
-import { View, Text, Image } from 'react-native';
+import { View, Text, Image, TouchableOpacity, Alert } from 'react-native';
 import { Colors } from '../styles';
+import * as Clipboard from 'expo-clipboard';
+import * as Haptics from 'expo-haptics';
 
 export default function ChatBubbleAI({ text }: { text: string }) {
+  const handleLongPress = async () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    Alert.alert(
+      "Message Options",
+      "What would you like to do?",
+      [
+        { text: "Cancel", style: "cancel" },
+        { 
+          text: "Copy Message", 
+          onPress: async () => {
+            await Clipboard.setStringAsync(text);
+          }
+        }
+      ]
+    );
+  };
+
   return (
     <View
       style={{
@@ -23,8 +42,13 @@ export default function ChatBubbleAI({ text }: { text: string }) {
       />
 
       {/* Text */}
-      <View style={{ flex: 1 }}>
+      <TouchableOpacity 
+        activeOpacity={0.9} 
+        onLongPress={handleLongPress}
+        style={{ flex: 1 }}
+      >
         <Text
+          selectable={true}
           style={{
             color: Colors.textSecondary,
             fontSize: 13,
@@ -33,7 +57,7 @@ export default function ChatBubbleAI({ text }: { text: string }) {
         >
           {text}
         </Text>
-      </View>
+      </TouchableOpacity>
     </View>
   );
 }

@@ -1,19 +1,41 @@
-import { View, Text, Image } from 'react-native';
+import { View, Text, Image, TouchableOpacity, Alert } from 'react-native';
 import { ComponentStyles, ComponentTextStyles } from '../styles';
+import * as Clipboard from 'expo-clipboard';
+import * as Haptics from 'expo-haptics';
 
 export default function ChatBubble({ type, text }: any) {
   const isUser = type === 'user';
 
+  const handleLongPress = async () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    Alert.alert(
+      "Message Options",
+      "What would you like to do?",
+      [
+        { text: "Cancel", style: "cancel" },
+        { 
+          text: "Copy Message", 
+          onPress: async () => {
+            await Clipboard.setStringAsync(text);
+          }
+        }
+      ]
+    );
+  };
+
   // ===== USER MESSAGE =====
   if (isUser) {
     return (
-      <View
+      <TouchableOpacity 
+        activeOpacity={0.9} 
+        onLongPress={handleLongPress}
         style={[
           ComponentStyles.chatBubble,
           ComponentStyles.chatBubbleUser,
         ]}
       >
         <Text
+          selectable={true}
           style={[
             ComponentTextStyles.chatBubbleText,
             ComponentTextStyles.chatBubbleTextUser,
@@ -21,7 +43,7 @@ export default function ChatBubble({ type, text }: any) {
         >
           {text}
         </Text>
-      </View>
+      </TouchableOpacity>
     );
   }
 
@@ -35,11 +57,18 @@ export default function ChatBubble({ type, text }: any) {
       />
 
       {/* AI TEXT */}
-      <View style={ComponentStyles.chatBubbleAI}>
-        <Text style={ComponentTextStyles.chatBubbleText}>
+      <TouchableOpacity 
+        activeOpacity={0.9} 
+        onLongPress={handleLongPress}
+        style={ComponentStyles.chatBubbleAI}
+      >
+        <Text 
+          selectable={true}
+          style={ComponentTextStyles.chatBubbleText}
+        >
           {text}
         </Text>
-      </View>
+      </TouchableOpacity>
     </View>
   );
 }

@@ -1,13 +1,11 @@
 import axios from "axios";
 import type {
-  ApiConversation,
-  ApiMessage,
-  Conversation,
-  Message,
+    ApiConversation,
+    ApiMessage,
+    Conversation,
+    Message,
 } from "../types";
 import { getValueFor } from "../utils/storage";
-
-
 
 type ClearAllresponseponse = { message: string };
 
@@ -100,7 +98,6 @@ export function createConversationsApi() {
   };
 
   const clearAllChats = async (): Promise<ClearAllresponseponse> => {
-
     const response = await axios.delete(`${apiBase}/conversations/clear`, {
       headers: await authHeaders(),
     });

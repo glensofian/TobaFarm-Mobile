@@ -1,7 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { LlamaContext } from "llama.rn";
+import { loadLocalModel } from "../utils/modelDownloader";
+import { useNetwork } from "@/context/NetworkContext";
+import { useNetworkStatus } from "./useNetworkStatus";
 
 type Params = {
-  wsUrl: string;
+  model: string;
   getActiveConversationId: () => string;
   onToken: (conversationId: string, token: string) => void;
   onDone: (conversationId: string, fullText: string) => void;
@@ -17,7 +21,7 @@ type RetryState = {
 };
 
 export function useWebSocketChat({
-  wsUrl,
+  model,
   getActiveConversationId,
   onToken,
   onDone,
@@ -25,15 +29,15 @@ export function useWebSocketChat({
 }: Params) {
   const wsRef = useRef<WebSocket | null>(null);
 
-  const getCidRef = useRef(getActiveConversationId);
+  const getConversationIdRef = useRef(getActiveConversationId);
   const onTokenRef = useRef(onToken);
   const onDoneRef = useRef(onDone);
 
-  getCidRef.current = getActiveConversationId;
+  getConversationIdRef.current = getActiveConversationId;
   onTokenRef.current = onToken;
   onDoneRef.current = onDone;
 
-  const currentCidRef = useRef<string | null>(null);
+  const currentConversationIdRef = useRef<string | null>(null);
 
   const fullRef = useRef("");
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -45,13 +49,19 @@ export function useWebSocketChat({
     timer: null,
     stopped: false,
   });
+  
+  const [llamaContext, setLlamaContext] = useState<LlamaContext | null>(null);
+  const [isOfflineLoading, setIsOfflineLoading] = useState(false);
+
+  const {isInternetReachable, isConnected } = useNetwork();
+  const {isConnected: isNetworkConnected, justDisconnected, justConnected } = useNetworkStatus();
 
   const flushDone = useCallback(() => {
-    const cid = currentCidRef.current || getCidRef.current();
+    const conversationId = currentConversationIdRef.current || getConversationIdRef.current();
     const full = fullRef.current;
     if (full) {
-      console.log("WS Done (flush):", { cid, textLen: full.length });
-      onDoneRef.current(cid, full);
+      console.log("WS Done (flush):", { conversationId, textLen: full.length });
+      onDoneRef.current(conversationId, full);
     }
     fullRef.current = "";
   }, []);
@@ -87,99 +97,145 @@ export function useWebSocketChat({
       };
     }
 
-    const connect = () => {
+    const isOffline = model === "tofa-offline";
+
+    const connect = async () => {
       if (retry.stopped) return;
 
-      setStatus("connecting");
-
-      const ws = new WebSocket(wsUrl);
-      wsRef.current = ws;
-
-      ws.onopen = () => {
-        retry.attempt = 0;
-        setStatus("open");
-        console.log("WS connected:", wsUrl);
-      };
-
-      ws.onmessage = (event) => {
-        const rawData = event.data;
-        console.log("WS received:", rawData);
-        const cid = currentCidRef.current || getCidRef.current();
-
-        // Lock the CID for this stream
-        if (!currentCidRef.current) {
-          currentCidRef.current = cid;
-        }
-
-        let token = "";
-
-        if (typeof rawData === "string") {
-          // Handle [DONE] marker
-          if (rawData === "[DONE]") {
-            console.log("[WS DONE] marker received", { cid });
-            const full = fullRef.current;
-            if (full) onDoneRef.current(cid, full);
-            fullRef.current = "";
-            currentCidRef.current = null;
-            if (saveTimeoutRef.current) {
-              clearTimeout(saveTimeoutRef.current);
-              saveTimeoutRef.current = null;
+      if (isOffline) {
+        if (!llamaContext && !isOfflineLoading) {
+          console.log("Loading local model for:", model);
+          setIsOfflineLoading(true);
+          setStatus("connecting");
+          try {
+            const result = await loadLocalModel();
+            setIsOfflineLoading(false);
+            if (result.success && result.context) {
+              setLlamaContext(result.context);
+              setStatus("open");
+              console.log("Local model loaded successfully");
+            } else {
+              setStatus("error");
+              console.warn("Failed to load local model:", result.error);
             }
-            return;
+          } catch (err) {
+            setIsOfflineLoading(false);
+            setStatus("error");
+            console.error("Local model load crash:", err);
+          }
+        } else if (llamaContext) {
+          setStatus("open");
+        }
+        return;
+      }
+
+      setStatus("connecting");
+      let wsUrl = "";
+      console.log("WS connecting:", model);
+      console.log("WS URL:", process.env.EXPO_PUBLIC_TOFA_AI_URL);
+
+      if (model === "tofa-lite") {
+        wsUrl = process.env.EXPO_PUBLIC_TOFA_AI_URL + "/ws-base";
+      } else if (model === "tofa-pro") {
+        wsUrl = process.env.EXPO_PUBLIC_TOFA_AI_URL + "/ws-rag";
+      } else if (model === "tofa-ultra") {
+        wsUrl = process.env.EXPO_PUBLIC_TOFA_AI_URL + "/ws-rag";
+      }
+
+      if (!wsUrl || wsUrl.startsWith("undefined")) {
+        console.warn("No valid WS URL for model:", model);
+        setStatus("idle");
+        return;
+      }
+
+      try {
+        const ws = new WebSocket(wsUrl);
+        wsRef.current = ws;
+
+        ws.onopen = () => {
+          retry.attempt = 0;
+          setStatus("open");
+          console.log("WS connected:", wsUrl);
+        };
+
+        ws.onmessage = (event) => {
+          const rawData = event.data;
+        console.log("WS received:", rawData);
+          const conversationId = currentConversationIdRef.current || getConversationIdRef.current();
+
+          if (!currentConversationIdRef.current) {
+            currentConversationIdRef.current = conversationId;
           }
 
-          // Strict JSON check
-          if (rawData.startsWith("{") && rawData.endsWith("}")) {
-            try {
-              const parsed = JSON.parse(rawData);
-              token = parsed.token || parsed.text || parsed.content || rawData;
-            } catch {
+          let token = "";
+
+          if (typeof rawData === "string") {
+            if (rawData === "[DONE]") {
+              const full = fullRef.current;
+              if (full) onDoneRef.current(conversationId, full);
+              fullRef.current = "";
+              currentConversationIdRef.current = null;
+              if (saveTimeoutRef.current) {
+                clearTimeout(saveTimeoutRef.current);
+                saveTimeoutRef.current = null;
+              }
+              return;
+            }
+
+            if (rawData.startsWith("{") && rawData.endsWith("}")) {
+              try {
+                const parsed = JSON.parse(rawData);
+                token = parsed.token || parsed.text || parsed.content || rawData;
+              } catch {
+                token = rawData;
+              }
+            } else {
               token = rawData;
             }
           } else {
-            token = rawData;
+            token = String(rawData ?? "");
           }
-        } else {
-          token = String(rawData ?? "");
-        }
 
-        if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+          if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
 
-        fullRef.current += token;
-        onTokenRef.current(cid, token);
+          fullRef.current += token;
+          onTokenRef.current(conversationId, token);
 
-        saveTimeoutRef.current = setTimeout(() => {
-          console.log("[WS TIMEOUT] Saving due to inactivity", { cid, len: fullRef.current.length });
+          saveTimeoutRef.current = setTimeout(() => {
+            flushDone();
+            currentConversationIdRef.current = null;
+          }, 1500);
+        };
+
+        ws.onclose = () => {
+          if (saveTimeoutRef.current) {
+            clearTimeout(saveTimeoutRef.current);
+            saveTimeoutRef.current = null;
+          }
+
           flushDone();
-          currentCidRef.current = null;
-        }, 1500);
-      };
+          wsRef.current = null;
 
-      ws.onclose = () => {
-        if (saveTimeoutRef.current) {
-          clearTimeout(saveTimeoutRef.current);
-          saveTimeoutRef.current = null;
-        }
+          if (retry.stopped) {
+            setStatus("closed");
+            return;
+          }
 
-        flushDone();
-        wsRef.current = null;
+          retry.attempt += 1;
+          const delay = Math.min(1000 * 2 ** (retry.attempt - 1), 10_000);
 
-        if (retry.stopped) {
           setStatus("closed");
-          return;
-        }
+          retry.timer = setTimeout(connect, delay);
+        };
 
-        retry.attempt += 1;
-        const delay = Math.min(1000 * 2 ** (retry.attempt - 1), 10_000);
-
-        setStatus("closed");
-        retry.timer = setTimeout(connect, delay);
-      };
-
-      ws.onerror = () => {
+        ws.onerror = () => {
+          setStatus("error");
+          console.warn("WS error:", wsUrl);
+        };
+      } catch (err) {
+        console.error("WS constructor error:", err);
         setStatus("error");
-        console.warn("WS error:", wsUrl);
-      };
+      }
     };
 
     connect();
@@ -188,7 +244,7 @@ export function useWebSocketChat({
       retry.stopped = true;
       cleanup(retry);
     };
-  }, [wsUrl, enabled, cleanup, flushDone]);
+  }, [model, enabled, cleanup, flushDone, llamaContext, isOfflineLoading]);
 
   useEffect(() => {
     if (!enabled) {
@@ -202,27 +258,65 @@ export function useWebSocketChat({
       saveTimeoutRef.current = null;
     }
     fullRef.current = "";
-    currentCidRef.current = null;
+    currentConversationIdRef.current = null;
 
     if (wsRef.current) {
       wsRef.current.close();
       wsRef.current = null;
     }
-
-
   }, []);
 
-  const send = useCallback((text: string, cid?: string) => {
+  const send = useCallback(async (text: string, conversationId?: string) => {
+    const isOffline = model === "tofa-offline";
+    const threadId = conversationId || currentConversationIdRef.current || getConversationIdRef.current();
+
+    if (isOffline) {
+      if (!llamaContext) {
+        console.warn("Llama context not ready for offline sending");
+        return false;
+      }
+
+      currentConversationIdRef.current = threadId;
+      fullRef.current = "";
+
+      try {
+        console.log("Starting local model completion...");
+        await llamaContext.completion(
+          {
+            messages: [
+              { role: 'user', content: text }
+            ],
+            n_predict: 512,
+            temperature: 0.7,
+            top_k: 40,
+            top_p: 0.9,
+            stop: ["<|im_end|>", "### Instruction:", "### User:", "User:", "\n\n"]
+          },
+          (data) => {
+            const token = data.token;
+            fullRef.current += token;
+            onTokenRef.current(threadId, token);
+          }
+        );
+
+        console.log("Local completion done");
+        onDoneRef.current(threadId, fullRef.current);
+        fullRef.current = "";
+        currentConversationIdRef.current = null;
+        return true;
+      } catch (err) {
+        console.error("Local inference error:", err);
+        return false;
+      }
+    }
+
     const ws = wsRef.current;
     if (!ws || ws.readyState !== WebSocket.OPEN) return false;
 
-    if (cid) {
-      currentCidRef.current = cid;
-    }
-
+    currentConversationIdRef.current = threadId;
     ws.send(text);
     return true;
-  }, []);
+  }, [model, llamaContext]);
 
   return { send, status, stop };
 }

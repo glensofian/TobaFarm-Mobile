@@ -18,6 +18,7 @@ nativewind-env.d.ts
 *.p12
 *.key
 *.mobileprovision
+assets/models/*s
 
 # Metro
 .metro-health-check*
@@ -43,3 +44,4 @@ app-example
 # generated native folders
 /ios
 /android
+

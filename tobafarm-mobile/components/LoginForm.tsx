@@ -1,10 +1,10 @@
-import { View, Text, TextInput, TouchableOpacity } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { useState } from 'react';
-import { ComponentStyles, ComponentTextStyles } from '../styles';
-import { useRouter } from 'expo-router';
-import axios from 'axios';
-import { save } from '../utils/storage';
+import { Ionicons } from "@expo/vector-icons";
+import axios from "axios";
+import { useRouter } from "expo-router";
+import { useState } from "react";
+import { Text, TextInput, TouchableOpacity, View } from "react-native";
+import { ComponentStyles, ComponentTextStyles } from "../styles";
+import { save } from "../utils/storage";
 
 export default function LoginForm() {
   const [showPassword, setShowPassword] = useState(false);
@@ -14,7 +14,6 @@ export default function LoginForm() {
   const [password, setPassword] = useState("");
 
   const router = useRouter();
-
 
   const onSubmit = async () => {
     setError(null);
@@ -34,11 +33,11 @@ export default function LoginForm() {
         username: em,
         password: pw,
       });
-      console.log("Answer:")
-      console.log(process.env.EXPO_PUBLIC_TOFA_API_URL)
+      console.log("Answer:");
+      console.log(process.env.EXPO_PUBLIC_TOFA_API_URL);
       const response = await axios.post(
         `${process.env.EXPO_PUBLIC_TOFA_API_URL}/auth/token`,
-        payload
+        payload,
       );
 
       console.log("Response Status:");
@@ -67,15 +66,12 @@ export default function LoginForm() {
     }
   };
 
-
   return (
     <View style={ComponentStyles.loginCard}>
-      <Text style={ComponentTextStyles.loginLabel}>
-        Email / No. Telp :
-      </Text>
+      <Text style={ComponentTextStyles.loginLabel}>Email / No. Telp :</Text>
 
       {error && (
-        <Text style={{ color: 'red', marginBottom: 10, textAlign: 'center' }}>
+        <Text style={{ color: "red", marginBottom: 10, textAlign: "center" }}>
           {error}
         </Text>
       )}
@@ -88,9 +84,7 @@ export default function LoginForm() {
         autoCapitalize="none"
       />
 
-      <Text style={ComponentTextStyles.loginLabel}>
-        Password :
-      </Text>
+      <Text style={ComponentTextStyles.loginLabel}>Password :</Text>
 
       <View style={ComponentStyles.passwordWrapper}>
         <TextInput
@@ -102,19 +96,18 @@ export default function LoginForm() {
         />
         <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
           <Ionicons
-            name={showPassword ? 'eye-off-outline' : 'eye-outline'}
+            name={showPassword ? "eye-off-outline" : "eye-outline"}
             size={20}
             color="#333"
           />
         </TouchableOpacity>
       </View>
 
-      <Text
-        style={ComponentTextStyles.registerText}>
-        Belum memiliki akun?{' '}
+      <Text style={ComponentTextStyles.registerText}>
+        Belum memiliki akun?{" "}
         <Text
           style={ComponentTextStyles.registerHighlight}
-          onPress={() => router.push('/register')}
+          onPress={() => router.push("/register")}
         >
           Daftar
         </Text>
@@ -127,7 +120,7 @@ export default function LoginForm() {
         disabled={loading}
       >
         <Text style={ComponentTextStyles.loginSubmitText}>
-          {loading ? 'Logging in...' : 'Log in'}
+          {loading ? "Logging in..." : "Log in"}
         </Text>
       </TouchableOpacity>
     </View>

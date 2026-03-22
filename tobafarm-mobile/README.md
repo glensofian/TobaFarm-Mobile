@@ -51,3 +51,22 @@ Join our community of developers creating universal apps.
 
 - [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
 - [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+
+# Model Testing
+
+New-NetFirewallRule -DisplayName "TobaFarm Backend" -Direction Inbound -LocalPort 8001 -Protocol TCP -Action Allow
+
+# Checking models existance:
+curl -X GET "http://[IP_ADDRESS]/models" -H "accept: application/json"
+
+# 1. Install llama.rn
+npm install llama.rn
+
+# 2. Prebuild with native code (after fixing icon issue)
+npx expo prebuild --platform android --clean
+
+# 3. Build and install custom dev client on device/emulator
+npx expo run:android
+
+# 4. Start dev server
+npx expo start --dev-client

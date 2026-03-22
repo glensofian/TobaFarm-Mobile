@@ -1,9 +1,9 @@
-import { View, Text, TextInput, TouchableOpacity } from 'react-native';
-import { useRouter, useLocalSearchParams } from 'expo-router';
-import { ComponentStyles, ComponentTextStyles } from '../styles';
-import { OTPCreate, OTPInput } from '@/types/otp';
-import { useState, useRef, useEffect } from 'react';
-import axios from 'axios';
+import { OTPCreate, OTPInput } from "@/types/otp";
+import axios from "axios";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import { useEffect, useRef, useState } from "react";
+import { Text, TextInput, TouchableOpacity, View } from "react-native";
+import { ComponentStyles, ComponentTextStyles } from "../styles";
 
 export default function OtpForm() {
   const router = useRouter();
@@ -55,7 +55,7 @@ export default function OtpForm() {
     } catch (error) {
       setError("Gagal mengirim OTP. Coba lagi.");
     }
-  }
+  };
 
   const onSubmit = async () => {
     setError(null);
@@ -73,15 +73,14 @@ export default function OtpForm() {
     }
 
     try {
-
       const payload: OTPInput = {
         email: email,
         otp: code,
-      }
+      };
 
       const response = await axios.post(
         `${process.env.EXPO_PUBLIC_TOFA_API_URL}/otp/verify`,
-        payload
+        payload,
       );
 
       if (response.status !== 200) {
@@ -93,7 +92,7 @@ export default function OtpForm() {
 
       const verifyRegistrationResponse = await axios.post(
         `${process.env.EXPO_PUBLIC_TOFA_API_URL}/auth/verify`,
-        payload
+        payload,
       );
 
       if (verifyRegistrationResponse.status !== 200) {
@@ -152,12 +151,12 @@ export default function OtpForm() {
       />
 
       {error && (
-        <Text style={{ color: 'red', marginBottom: 10, textAlign: 'center' }}>
+        <Text style={{ color: "red", marginBottom: 10, textAlign: "center" }}>
           {error}
         </Text>
       )}
       {info && (
-        <Text style={{ color: 'green', marginBottom: 10, textAlign: 'center' }}>
+        <Text style={{ color: "green", marginBottom: 10, textAlign: "center" }}>
           {info}
         </Text>
       )}
@@ -169,7 +168,7 @@ export default function OtpForm() {
         disabled={loading}
       >
         <Text style={ComponentTextStyles.loginSubmitText}>
-          {loading ? 'Verifying...' : 'Continue'}
+          {loading ? "Verifying..." : "Continue"}
         </Text>
       </TouchableOpacity>
 
@@ -180,11 +179,8 @@ export default function OtpForm() {
           ComponentTextStyles.otpResendText,
         ]}
       >
-        Belum mendapatkan Kode?{' '}
-        <Text
-          style={ComponentTextStyles.registerHighlight}
-          onPress={onResend}
-        >
+        Belum mendapatkan Kode?{" "}
+        <Text style={ComponentTextStyles.registerHighlight} onPress={onResend}>
           Kirim Ulang
         </Text>
       </Text>

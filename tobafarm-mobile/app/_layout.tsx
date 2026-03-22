@@ -1,6 +1,7 @@
-import { Stack } from 'expo-router';
 import { useFonts } from 'expo-font';
-import { View, ActivityIndicator } from 'react-native';
+import { Stack } from 'expo-router';
+import { ActivityIndicator, View } from 'react-native';
+import { NetworkProvider } from '../context/NetworkContext';
 
 export default function Layout() {
   // Load font aplikasi
@@ -22,11 +23,13 @@ export default function Layout() {
 
   // Root navigation untuk seluruh halaman aplikasi
   return (
-    <Stack
-      screenOptions={{
-        headerShown: false,
-        animation: 'slide_from_right',
-      }}
-    />
+    <NetworkProvider>
+      <Stack
+        screenOptions={{
+          headerShown: false,
+          animation: 'slide_from_right',
+        }}
+      />
+    </NetworkProvider>
   );
 }

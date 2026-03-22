@@ -1,11 +1,11 @@
-import { View, Text, TextInput, TouchableOpacity } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { useState } from 'react';
-import { useRouter } from 'expo-router';
-import { ComponentStyles, ComponentTextStyles } from '../styles';
-import { RegisterUser } from '@/types/user';
-import axios from 'axios';
-import { OTPCreate } from '@/types/otp';
+import { OTPCreate } from "@/types/otp";
+import { RegisterUser } from "@/types/user";
+import { Ionicons } from "@expo/vector-icons";
+import axios from "axios";
+import { useRouter } from "expo-router";
+import { useState } from "react";
+import { Text, TextInput, TouchableOpacity, View } from "react-native";
+import { ComponentStyles, ComponentTextStyles } from "../styles";
 
 export default function RegisterForm() {
   const router = useRouter();
@@ -16,7 +16,6 @@ export default function RegisterForm() {
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [loading, setLoading] = useState(false);
-
 
   const [error, setError] = useState<string | null>(null);
 
@@ -62,16 +61,15 @@ export default function RegisterForm() {
       username: un,
       email: em,
       password: pw,
-      role: "user"
-    }
+      role: "user",
+    };
 
     try {
       setLoading(true);
 
-
       const response = await axios.post(
         `${process.env.EXPO_PUBLIC_TOFA_API_URL}/auth/register`,
-        payload
+        payload,
       );
 
       if (response.status !== 200) {
@@ -83,7 +81,7 @@ export default function RegisterForm() {
 
       router.push({
         pathname: "/otp",
-        params: { email: em, user_id: response.data.user_id } as OTPCreate
+        params: { email: em, user_id: response.data.user_id } as OTPCreate,
       });
     } catch {
       setError("Registrasi gagal. Silakan coba lagi.");
@@ -96,18 +94,22 @@ export default function RegisterForm() {
     <View style={ComponentStyles.loginCard}>
       {/* USERNAME */}
       {error && (
-        <Text style={ComponentTextStyles.registerErrorText}>
-          {error}
-        </Text>
+        <Text style={ComponentTextStyles.registerErrorText}>{error}</Text>
       )}
       <Text style={ComponentTextStyles.loginLabel}>Username :</Text>
-      <TextInput style={ComponentStyles.loginInput} value={username} onChangeText={setUsername} />
+      <TextInput
+        style={ComponentStyles.loginInput}
+        value={username}
+        onChangeText={setUsername}
+      />
 
-      {/* EMAIL */} 
-      <Text style={ComponentTextStyles.loginLabel}>
-        Email:
-      </Text>
-      <TextInput style={ComponentStyles.loginInput} value={email} onChangeText={setEmail} />
+      {/* EMAIL */}
+      <Text style={ComponentTextStyles.loginLabel}>Email:</Text>
+      <TextInput
+        style={ComponentStyles.loginInput}
+        value={email}
+        onChangeText={setEmail}
+      />
 
       {/* PASSWORD */}
       <Text style={ComponentTextStyles.loginLabel}>Password :</Text>
@@ -120,7 +122,7 @@ export default function RegisterForm() {
         />
         <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
           <Ionicons
-            name={showPassword ? 'eye-off-outline' : 'eye-outline'}
+            name={showPassword ? "eye-off-outline" : "eye-outline"}
             size={20}
             color="#333"
           />
@@ -128,9 +130,7 @@ export default function RegisterForm() {
       </View>
 
       {/* CONFIRM PASSWORD */}
-      <Text style={ComponentTextStyles.loginLabel}>
-        Konfirmasi Password :
-      </Text>
+      <Text style={ComponentTextStyles.loginLabel}>Konfirmasi Password :</Text>
       <View style={ComponentStyles.passwordWrapper}>
         <TextInput
           secureTextEntry={!showConfirmPassword}
@@ -139,16 +139,10 @@ export default function RegisterForm() {
           onChangeText={setConfirm}
         />
         <TouchableOpacity
-          onPress={() =>
-            setShowConfirmPassword(!showConfirmPassword)
-          }
+          onPress={() => setShowConfirmPassword(!showConfirmPassword)}
         >
           <Ionicons
-            name={
-              showConfirmPassword
-                ? 'eye-off-outline'
-                : 'eye-outline'
-            }
+            name={showConfirmPassword ? "eye-off-outline" : "eye-outline"}
             size={20}
             color="#333"
           />
@@ -157,10 +151,10 @@ export default function RegisterForm() {
 
       {/* LOGIN LINK */}
       <Text style={ComponentTextStyles.registerText}>
-        Sudah memiliki akun?{' '}
+        Sudah memiliki akun?{" "}
         <Text
           style={ComponentTextStyles.registerHighlight}
-          onPress={() => router.push('/login')}
+          onPress={() => router.push("/login")}
         >
           Masuk
         </Text>
@@ -168,14 +162,13 @@ export default function RegisterForm() {
       </Text>
 
       {/* SUBMIT */}
-      <TouchableOpacity 
-      style={ComponentStyles.loginSubmitButton}
-      onPress={onSubmit}
-      disabled={loading}
+      <TouchableOpacity
+        style={ComponentStyles.loginSubmitButton}
+        onPress={onSubmit}
+        disabled={loading}
       >
-        <Text 
-          style={ComponentTextStyles.loginSubmitText}>
-          {loading ? 'Loading...' : 'Sign Up'}
+        <Text style={ComponentTextStyles.loginSubmitText}>
+          {loading ? "Loading..." : "Sign Up"}
         </Text>
       </TouchableOpacity>
     </View>
