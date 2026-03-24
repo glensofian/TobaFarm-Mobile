@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import axios from "axios";
 import { useRouter } from "expo-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Text, TextInput, TouchableOpacity, View } from "react-native";
 import { ComponentStyles, ComponentTextStyles } from "../styles";
 import { save } from "../utils/storage";
@@ -10,10 +10,15 @@ export default function LoginForm() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [identifier, setIdentifier] = useState(""); // Email / No Telp
+  const [identifier, setIdentifier] = useState(""); // Email / Username
   const [password, setPassword] = useState("");
 
   const router = useRouter();
+
+  useEffect(() => {
+    setIdentifier("williamnapitupulu67@gmail.com");
+    setPassword("Napit@123");
+  }, []);
 
   const onSubmit = async () => {
     setError(null);
@@ -22,7 +27,7 @@ export default function LoginForm() {
     const pw = password.trim();
 
     if (!em || !pw) {
-      setError("Email/No. Telp dan Password wajib diisi.");
+      setError("Email dan Password wajib diisi.");
       return;
     }
 
@@ -38,6 +43,11 @@ export default function LoginForm() {
       const response = await axios.post(
         `${process.env.EXPO_PUBLIC_TOFA_API_URL}/auth/token`,
         payload,
+        {
+          headers: {
+            "Content-Type": "application/x-www-form-urlencoded",
+          },
+        }
       );
 
       console.log("Response Status:");
@@ -54,12 +64,17 @@ export default function LoginForm() {
       await save("token", response.data.access_token);
       await save("user", JSON.stringify(response.data.user));
 
-      console.log("Routing to roomcaht");
-      // Simulasi sukses sementara:
+      console.log("Routing to roomchat");
       await new Promise((r) => setTimeout(r, 500));
 
       router.push("/roomchat");
-    } catch {
+    } catch (err: any) {
+      console.error("Login Error Details:", {
+        message: err.message,
+        status: err.response?.status,
+        data: err.response?.data,
+        config: err.config?.url
+      });
       setError("Login gagal. Silakan cek kembali data Anda.");
     } finally {
       setLoading(false);
@@ -68,7 +83,7 @@ export default function LoginForm() {
 
   return (
     <View style={ComponentStyles.loginCard}>
-      <Text style={ComponentTextStyles.loginLabel}>Email / No. Telp :</Text>
+      <Text style={ComponentTextStyles.loginLabel}>Email :</Text>
 
       {error && (
         <Text style={{ color: "red", marginBottom: 10, textAlign: "center" }}>
@@ -92,6 +107,7 @@ export default function LoginForm() {
           style={ComponentStyles.passwordInput}
           value={password}
           onChangeText={setPassword}
+          defaultValue="Napit@123"
           placeholder="Password"
         />
         <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
