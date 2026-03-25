@@ -275,6 +275,121 @@ export const ComponentStyles = StyleSheet.create({
     backgroundColor: Colors.buttonPrimary,
     borderRadius: 4,
   },
+
+/* ===== HOME SCREEN ===== */
+  homeLogoContainer: {
+    flex: 1.6,
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+  },
+  
+  homeLogo: {
+    width: 220,
+    height: 220,
+  },
+  
+  homePromptContainer: {
+    flex: 1.4,
+    width: '85%',
+    alignSelf: 'center',
+  },
+
+  /* ===== ROOM CHAT HEADER ===== */
+  roomChatHeader: {
+    height: 52,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    zIndex: 1001,
+  },
+  roomChatHeaderCenter: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  roomChatDropdownTrigger: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  roomChatHeaderIcons: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+
+  /* ===== MODEL DROPDOWN MODAL ===== */
+  dropdownModal: {
+    position: 'absolute',
+    top: 35,
+    backgroundColor: Colors.white,
+    borderRadius: 12,
+    minWidth: 160,
+    paddingVertical: 8,
+    elevation: 8,
+    shadowColor: Colors.black,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4.65,
+    zIndex: 1000,
+  },
+  dropdownHeader: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  dropdownItem: {
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+  },
+  dropdownItemRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  dropdownItemContent: {
+    flex: 1,
+  },
+  dropdownOfflineRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  dropdownOfflineInner: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  dropdownDownloadBtn: {
+    padding: 4,
+    marginLeft: 8,
+  },
+  dropdownBackdrop: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 1000,
+  },
+
+  /* ===== CHAT LIST & SYNC ===== */
+  chatListContainer: {
+    flex: 1,
+  },
+  syncBanner: {
+    backgroundColor: Colors.accentPrimary,
+    paddingVertical: 6,
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.1)',
+  },
 });
 
 export const ComponentTextStyles = StyleSheet.create({
@@ -407,5 +522,43 @@ export const ComponentTextStyles = StyleSheet.create({
     fontFamily: 'Montserrat-SemiBold',
     fontSize: 15,
     color: Colors.black,
+  },
+
+  /* ===== HOME TEXT ===== */
+  homeGreeting: {
+    color: Colors.textSecondary,
+  },
+  
+  homeQuestion: {
+    color: Colors.textPrimary,
+    marginBottom: 12,
+  },
+
+  /* ===== ROOM CHAT TEXT ===== */
+  roomChatHeaderTitle: {
+    color: Colors.white,
+    fontFamily: 'Montserrat-SemiBold',
+    fontSize: 16,
+  },
+  dropdownHeaderText: {
+    fontFamily: 'Montserrat-Bold',
+    fontSize: 12,
+    color: '#666',
+    textTransform: 'uppercase',
+  },
+  dropdownModelName: {
+    fontFamily: 'Montserrat-Medium',
+    fontSize: 15,
+  },
+  dropdownRequirementText: {
+    fontFamily: 'Montserrat-Regular',
+    fontSize: 10,
+    color: '#999',
+    marginTop: 2,
+  },
+  syncBannerText: {
+    fontFamily: 'Montserrat-SemiBold',
+    color: Colors.white,
+    fontSize: 11,
   },
 });

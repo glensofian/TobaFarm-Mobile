@@ -1,12 +1,40 @@
 import { View, Text, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import { useMemo, useState, useEffect } from 'react';
 import LoginButton from '../components/LoginButton';
 import ChatInput from '../components/ChatInput';
-import { Colors, Typography, Layout } from '../styles';
+import { Colors, Typography, Layout, ComponentStyles, ComponentTextStyles } from '../styles';
+import { getValueFor } from '../utils/storage';
 
 export default function Home() {
   const router = useRouter();
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+
+  // Check Log / No
+  useEffect(() => {
+    const checkAuth = async () => {
+      const token = await getValueFor("token"); 
+      setIsLoggedIn(!!token);
+    };
+    
+    checkAuth();
+  }, []);
+
+  // Greetings
+  const greeting = useMemo(() => {
+    const hour = new Date().getHours();
+    
+    if (hour >= 4 && hour < 11) {
+      return 'Selamat Pagi';
+    } else if (hour >= 11 && hour < 15) {
+      return 'Selamat Siang';
+    } else if (hour >= 15 && hour < 18) {
+      return 'Selamat Sore';
+    } else {
+      return 'Selamat Malam';
+    }
+  }, []);
 
   return (
     <SafeAreaView
@@ -15,26 +43,21 @@ export default function Home() {
       <LoginButton />
 
       {/* LOGO */}
-      <View style={{ flex: 1.6, justifyContent: 'flex-end', alignItems: 'center' }}>
+      <View style={ComponentStyles.homeLogoContainer}>
         <Image
           source={require('../assets/images/tobafarm-logo.png')}
-          style={{ width: 220, height: 220 }}
+          style={ComponentStyles.homeLogo}
           resizeMode="contain"
         />
       </View>
 
       {/* PROMPT */}
-      <View style={{ flex: 1.4, width: '85%', alignSelf: 'center' }}>
-        <Text style={[Typography.greeting, { color: Colors.textSecondary }]}>
-          Halo, Selamat Pagi
+      <View style={ComponentStyles.homePromptContainer}>
+        <Text style={[Typography.greeting, ComponentTextStyles.homeGreeting]}>
+          Halo, {greeting}
         </Text>
 
-        <Text
-          style={[
-            Typography.question,
-            { color: Colors.textPrimary, marginBottom: 12 },
-          ]}
-        >
+        <Text style={[Typography.question, ComponentTextStyles.homeQuestion]}>
           Apa yang boleh saya bantu ?
         </Text>
 
@@ -42,8 +65,9 @@ export default function Home() {
           onSend={(text) => {
             if (!text.trim()) return;
 
+            const targetPath = isLoggedIn ? '/roomchat' : '/roomguest';
             router.push({
-              pathname: '/roomchat',
+              pathname: targetPath,
               params: {
                 prompt: text,
               },

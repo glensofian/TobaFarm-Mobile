@@ -16,7 +16,7 @@ import { nowIso } from '@/utils/date';
 import { getValueFor, save } from '@/utils/storage';
 import { truncateTitle } from '@/utils/truncateTitle';
 import { uid } from '@/utils/uid';
-import { Colors, Layout } from '../styles';
+import { Colors, Layout, ComponentStyles, ComponentTextStyles } from '../styles'; 
 
 import { createConversationsApi } from '@/api/conversationsApi';
 import DownloadModel from '@/components/DownloadModel';
@@ -647,16 +647,7 @@ export default function RoomChat() {
       />
 
       {/* ===== HEADER ===== */}
-      <View
-        style={{
-          height: 52,
-          flexDirection: 'row',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          paddingHorizontal: 16,
-          zIndex: 1001,
-        }}
-      >
+      <View style={ComponentStyles.roomChatHeader}>
         <TouchableOpacity onPress={() => setSidebarOpen(!sidebarOpen)}>
           {sidebarOpen ? (
             <Ionicons name="menu" size={22} color={Colors.black} />
@@ -665,45 +656,21 @@ export default function RoomChat() {
           )}
         </TouchableOpacity>
 
-        <View style={{ alignItems: 'center', justifyContent: 'center' }}>
+        <View style={ComponentStyles.roomChatHeaderCenter}>
           <TouchableOpacity
             onPress={() => setModelsModalVisible(!modelsModalVisible)}
-            style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              gap: 4,
-            }}
+            style={ComponentStyles.roomChatDropdownTrigger}
           >
-            <Text
-              style={{
-                color: Colors.white,
-                fontSize: 16,
-                fontFamily: 'Montserrat-SemiBold',
-              }}
-            >
+            <Text style={ComponentTextStyles.roomChatHeaderTitle}>
               TobaFarm
             </Text>
             <Ionicons name="chevron-down-outline" size={20} color={Colors.white} />
           </TouchableOpacity>
 
           {modelsModalVisible && (
-            <View style={{
-              position: 'absolute',
-              top: 35,
-              backgroundColor: 'white',
-              borderRadius: 12,
-              minWidth: 160,
-              paddingVertical: 8,
-              elevation: 8,
-              shadowColor: '#000',
-              shadowOffset: { width: 0, height: 4 },
-              shadowOpacity: 0.3,
-              shadowRadius: 4.65,
-              zIndex: 1000,
-            }}>
-              <View style={{ paddingHorizontal: 16, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: '#f0f0f0' }}>
-                <Text style={{ fontSize: 12, color: '#666', fontWeight: '700', textTransform: 'uppercase' }}>Pilih Model</Text>
-
+            <View style={ComponentStyles.dropdownModal}>
+              <View style={ComponentStyles.dropdownHeader}>
+                <Text style={ComponentTextStyles.dropdownHeaderText}>Pilih Model</Text>
               </View>
 
               {availableModels.filter(m => m.type === 'online').map((model) => {
@@ -717,24 +684,27 @@ export default function RoomChat() {
                       setSelectedModel(model.id);
                       setModelsModalVisible(false);
                     }}
-                    style={{
-                      paddingVertical: 12,
-                      paddingHorizontal: 16,
-                      backgroundColor: selectedModel === model.id ? '#f5f5f5' : 'transparent',
-                      opacity: isOnlineDisabled ? 0.5 : 1,
-                    }}
+                    style={[
+                      ComponentStyles.dropdownItem,
+                      {
+                        backgroundColor: selectedModel === model.id ? '#f5f5f5' : 'transparent',
+                        opacity: isOnlineDisabled ? 0.5 : 1,
+                      }
+                    ]}
                   >
-                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                      <View style={{ flex: 1 }}>
-                        <Text style={{
-                          fontSize: 15,
-                          color: isOnlineDisabled ? '#888' : (selectedModel === model.id ? Colors.backgroundPrimary : '#333'),
-                          fontWeight: selectedModel === model.id ? '600' : '400'
-                        }}>
+                    <View style={ComponentStyles.dropdownItemRow}>
+                      <View style={ComponentStyles.dropdownItemContent}>
+                        <Text style={[
+                          ComponentTextStyles.dropdownModelName,
+                          {
+                            color: isOnlineDisabled ? '#888' : (selectedModel === model.id ? Colors.backgroundPrimary : '#333'),
+                            fontWeight: selectedModel === model.id ? '600' : '400'
+                          }
+                        ]}>
                           {model.label}
                         </Text>
                         {isOnlineDisabled && (
-                          <Text style={{ fontSize: 10, color: '#999', marginTop: 2 }}>
+                          <Text style={ComponentTextStyles.dropdownRequirementText}>
                             Butuh koneksi internet
                           </Text>
                         )}
@@ -753,14 +723,10 @@ export default function RoomChat() {
                 return (
                   <View
                     key={model.id}
-                    style={{
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      paddingHorizontal: 16,
-                      paddingVertical: 12,
-                      backgroundColor: selectedModel === model.id ? '#f5f5f5' : 'transparent',
-                    }}
+                    style={[
+                      ComponentStyles.dropdownOfflineRow,
+                      { backgroundColor: selectedModel === model.id ? '#f5f5f5' : 'transparent' }
+                    ]}
                   >
                     <TouchableOpacity
                       disabled={!isDownloaded}
@@ -768,14 +734,16 @@ export default function RoomChat() {
                         setSelectedModel(model.id);
                         setModelsModalVisible(false);
                       }}
-                      style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}
+                      style={{ flex: 1 }}
                     >
-                      <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', opacity: isDownloaded ? 1 : 0.5 }}>
-                        <Text style={{
-                          fontSize: 15,
-                          color: selectedModel === model.id ? Colors.backgroundPrimary : '#333',
-                          fontWeight: selectedModel === model.id ? '600' : '400'
-                        }}>
+                      <View style={[ComponentStyles.dropdownOfflineInner, { opacity: isDownloaded ? 1 : 0.5 }]}>
+                        <Text style={[
+                          ComponentTextStyles.dropdownModelName,
+                          {
+                            color: selectedModel === model.id ? Colors.backgroundPrimary : '#333',
+                            fontWeight: selectedModel === model.id ? '600' : '400'
+                          }
+                        ]}>
                           {model.label}
                         </Text>
                         {selectedModel === model.id && isDownloaded && (
@@ -786,14 +754,10 @@ export default function RoomChat() {
 
                     {!isDownloaded && (
                       <TouchableOpacity
-                        style={{
-                          padding: 4,
-                          marginLeft: 8
-                        }}
+                        style={ComponentStyles.dropdownDownloadBtn}
                         onPress={handleShowDownloadModel}
                       >
-                        <Ionicons
-                          name="add-outline" size={22} color={Colors.backgroundPrimary} />
+                        <Ionicons name="add-outline" size={22} color={Colors.backgroundPrimary} />
                       </TouchableOpacity>
                     )}
                   </View>
@@ -803,27 +767,13 @@ export default function RoomChat() {
           )}
         </View>
 
-        <View style={{ flexDirection: 'row', gap: 12 }}>
-          <Ionicons
-            name="create-outline"
-            size={20}
-            color={Colors.white}
-          />
-          <Ionicons
-            name="settings-outline"
-            size={20}
-            color={Colors.white}
-          />
+        <View style={ComponentStyles.roomChatHeaderIcons}>
+          <Ionicons name="create-outline" size={20} color={Colors.white} />
+          <Ionicons name="settings-outline" size={20} color={Colors.white} />
 
           {selectedModel === 'tofa-offline' && (
-            <TouchableOpacity
-              onPress={handleDeleteOfflineModel}
-            >
-              <Ionicons
-                name="trash"
-                size={20}
-                color={Colors.white}
-              />
+            <TouchableOpacity onPress={handleDeleteOfflineModel}>
+              <Ionicons name="trash" size={20} color={Colors.white} />
             </TouchableOpacity>
           )}
         </View>
@@ -832,31 +782,16 @@ export default function RoomChat() {
       {modelsModalVisible && (
         <TouchableOpacity
           activeOpacity={1}
-          style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            zIndex: 1000,
-          }}
+          style={ComponentStyles.dropdownBackdrop}
           onPress={() => setModelsModalVisible(false)}
         />
       )}
+
       {/* ===== CHAT LIST ===== */}
-      <View style={{ flex: 1 }}>
+      <View style={ComponentStyles.chatListContainer}>
         {isSyncing && (
-          <View style={{
-            backgroundColor: Colors.accentPrimary,
-            paddingVertical: 6,
-            alignItems: 'center',
-            flexDirection: 'row',
-            justifyContent: 'center',
-            gap: 8,
-            borderBottomWidth: 1,
-            borderBottomColor: 'rgba(255,255,255,0.1)'
-          }}>
-            <Text style={{ color: Colors.white, fontSize: 11, fontWeight: '600' }}>
+          <View style={ComponentStyles.syncBanner}>
+            <Text style={ComponentTextStyles.syncBannerText}>
               Menyinkronkan percakapan...
             </Text>
           </View>
@@ -871,7 +806,6 @@ export default function RoomChat() {
           onSend={(text) => onSend(undefined, text)}
         />
       </View>
-
 
       <NoInternetModal
         visible={!isNetworkConnected && !isModalDismissed}

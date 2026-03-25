@@ -8,15 +8,18 @@ import {
 } from '../styles';
 import { useNetwork } from '@/context/NetworkContext';
 
+// --- Props ---
 type Props = {
   onSend?: (text: string) => void;
   model?: string;
+  placeholder?: string;
 };
 
-export default function ChatInput({ onSend, model }: Props) {
+export default function ChatInput({ onSend, model, placeholder }: Props) {
   const [value, setValue] = useState('');
   const { isInternetReachable, isConnected } = useNetwork();
 
+  // --- Handlers ---
   const handleSend = () => {
     if (!value.trim()) return;
     if (model !== 'tofa-offline' && (!isInternetReachable || !isConnected)) {
@@ -32,11 +35,13 @@ export default function ChatInput({ onSend, model }: Props) {
       <TextInput
         value={value}
         onChangeText={setValue}
-        placeholder="Tanyakan sesuatu..."
+        placeholder={placeholder || "Tanyakan sesuatu..."}
         placeholderTextColor={Colors.placeholder}
         style={[
           ComponentTextStyles.chatInputText,
         ]}
+        returnKeyType="send"
+        onSubmitEditing={handleSend}
       />
 
       <TouchableOpacity

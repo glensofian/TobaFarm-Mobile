@@ -50,7 +50,7 @@ export const Layout = StyleSheet.create({
   /* ===== ChatScreen ===== */
   chatScreen: {
   flex: 1,
-  justifyContent: 'space-between',
+  justifyContent: 'flex-start',
 },
 
 chatInputContainer: {
