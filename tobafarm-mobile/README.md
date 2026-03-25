@@ -59,6 +59,10 @@ New-NetFirewallRule -DisplayName "TobaFarm Backend" -Direction Inbound -LocalPor
 # Checking models existance:
 curl -X GET "http://[IP_ADDRESS]/models" -H "accept: application/json"
 
+# Tells phone to access 8081
+adb -s 24RYD24530200851 reverse tcp:8001 tcp:8001
+
+
 # 1. Install llama.rn
 npm install llama.rn
 

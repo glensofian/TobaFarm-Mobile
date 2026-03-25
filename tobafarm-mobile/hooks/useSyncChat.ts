@@ -71,8 +71,7 @@ export const useSyncChat = ({ user, isInternetReachable }: SyncParams) => {
               msg.content,
             );
 
-            // Since our current API doesn't return a message ID,
-            // we just mark it as synced locally.
+            // Mark synced locally (cleanup sweep below will delete them all)
             await ChatRepository.markMessageSynced(msg.id, "synced");
             console.log(` Message synced: ${msg.id}`);
           } else {
@@ -85,7 +84,10 @@ export const useSyncChat = ({ user, isInternetReachable }: SyncParams) => {
         }
       }
 
-      console.log("✨ Chat sync completed.");
+      // Cleanup: Remove synced messages from local SQLite.
+      // We keep the conversation metadata locally so offline chats always have a parent.
+      const deletedMsgs = await ChatRepository.deleteSyncedMessages();
+      console.log(`✨ Chat sync completed. Removed ${deletedMsgs} synced messages. (Conversations preserved locally)`);
     } catch (err: any) {
       setLastError(err.message || "Sync failed");
       console.error("Sync error:", err);
