@@ -24,27 +24,27 @@ export const Layout = StyleSheet.create({
   },
 
   loginContainer: {
-    flex: 1,
+    flexGrow: 1,
     alignItems: 'center',
+    justifyContent: 'center',
+    paddingBottom: verticalScale(40),
+    paddingHorizontal: scale(20),
   },
 
   loginLogoWrapper: {
-    marginTop: verticalScale(48),
-    marginBottom: verticalScale(16),
+    marginBottom: verticalScale(10),
     alignItems: 'center',
   },
 
   loginLogo: {
-    width: scale(240),
-    height: scale(240),
-    maxWidth: 280,
-    maxHeight: 280,
+    width: scale(180),
+    height: scale(180),
+    maxWidth: 200,
+    maxHeight: 200,
   },
 
   loginFormWrapper: {
     width: '100%',
-    paddingHorizontal: scale(16),
-    transform: [{ translateY: verticalScale(-20) }],
   },
 
   /* ===== ChatScreen ===== */

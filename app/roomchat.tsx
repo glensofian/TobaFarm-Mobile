@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, Text, TouchableOpacity, View, BackHandler } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import ChatInput from '../components/ChatInput';
 import ChatList from '../components/ChatList';
@@ -116,6 +116,19 @@ export default function RoomChat() {
 
   const menuRef = useRef(null);
   const searchInputRef = useRef(null);
+
+  // Handle Back After Log in
+  useEffect(() => {
+  const backAction = () => {
+    return true; 
+  };
+
+  const backHandler = BackHandler.addEventListener(
+    'hardwareBackPress',
+    backAction
+  );
+  return () => backHandler.remove();
+}, []);
 
   /* =======================
    HANDLERS

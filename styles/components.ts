@@ -405,7 +405,6 @@ export const ComponentTextStyles = StyleSheet.create({
     fontFamily: "Montserrat-SemiBold",
     fontSize: 13,
     marginBottom: 6,
-    paddingVertical: 6,
   },
 
   registerText: {
