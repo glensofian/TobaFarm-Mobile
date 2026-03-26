@@ -4,23 +4,35 @@ import { Ionicons } from "@expo/vector-icons";
 import axios from "axios";
 import { useRouter } from "expo-router";
 import { useState } from "react";
-import { Text, TextInput, TouchableOpacity, View } from "react-native";
-import { ComponentStyles, ComponentTextStyles } from "../styles";
+import {
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+  Keyboard,
+  ActivityIndicator,
+  ScrollView,
+} from "react-native";
+import { ComponentStyles, ComponentTextStyles, Colors } from "../styles";
 
 export default function RegisterForm() {
   const router = useRouter();
+  
+  // Konsep: Satu state untuk mengontrol kedua field password
   const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
+  
   const [loading, setLoading] = useState(false);
-
   const [error, setError] = useState<string | null>(null);
 
+  // --- Logic Form Submission ---
   const onSubmit = async () => {
     setError(null);
+    Keyboard.dismiss();
 
     const un = username.trim();
     const em = email.trim();
@@ -31,146 +43,177 @@ export default function RegisterForm() {
       setError("Semua field wajib diisi.");
       return;
     }
-
-    if (un.length < 6) {
-      setError("Username minimal 6 karakter.");
-      return;
-    }
-
     if (un.includes(" ")) {
       setError("Username tidak boleh mengandung spasi.");
       return;
     }
-
+    if (un.length < 3) {
+      setError("Username minimal 3 karakter.");
+      return;
+    }
     if (!em.includes("@")) {
-      setError("Email tidak valid.");
+      setError("Format email tidak valid.");
       return;
     }
-
-    if (pw.length < 6) {
-      setError("Password minimal 6 karakter.");
+    if (pw.length < 8) {
+      setError("Password minimal 8 karakter.");
       return;
     }
-
+    if (!/[A-Z]/.test(pw)) {
+      setError("Password harus ada minimal satu huruf besar.");
+      return;
+    }
+    if (!/[0-9]/.test(pw)) {
+      setError("Password harus ada minimal satu angka.");
+      return;
+    }
     if (pw !== cf) {
       setError("Konfirmasi password tidak sama.");
       return;
     }
 
-    const payload: RegisterUser = {
-      username: un,
-      email: em,
-      password: pw,
-      role: "user",
-    };
-
     try {
       setLoading(true);
 
+      const payload: RegisterUser = {
+        username: un,
+        email: em,
+        password: pw,
+        role: "user",
+      };
+
       const response = await axios.post(
         `${process.env.EXPO_PUBLIC_TOFA_API_URL}/auth/register`,
-        payload,
+        payload
       );
 
-      if (response.status !== 200) {
-        setError("Registrasi gagal. Silakan coba lagi.");
-        return;
+      if (response.status === 200 || response.status === 201) {
+        const otpParams: OTPCreate = {
+          email: em,
+          user_id: response.data.id,
+          lang: "id",
+        };
+
+        await new Promise((r) => setTimeout(r, 600));
+
+        router.push({
+          pathname: "/otp",
+          params: otpParams as any,
+        });
       }
-
-      await new Promise((r) => setTimeout(r, 600));
-
-      router.push({
-        pathname: "/otp",
-        params: { email: em, user_id: response.data.user_id } as OTPCreate,
-      });
-    } catch {
-      setError("Registrasi gagal. Silakan coba lagi.");
+    } catch (err: any) {
+      if (err.response) {
+        setError(err.response.data?.detail || "Registrasi gagal.");
+      } else {
+        setError("Koneksi gagal. Periksa jaringan Anda.");
+      }
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <View style={ComponentStyles.loginCard}>
-      {/* USERNAME */}
-      {error && (
-        <Text style={ComponentTextStyles.registerErrorText}>{error}</Text>
-      )}
-      <Text style={ComponentTextStyles.loginLabel}>Username :</Text>
-      <TextInput
-        style={ComponentStyles.loginInput}
-        value={username}
-        onChangeText={setUsername}
-      />
+    <ScrollView 
+      showsVerticalScrollIndicator={false} 
+      keyboardShouldPersistTaps="handled"
+    >
+      <View style={ComponentStyles.loginCard}>
+        
+        {/* --- Error Display --- */}
+        {error && (
+          <Text style={[ComponentTextStyles.registerErrorText, { marginBottom: 15 }]}>
+            {error}
+          </Text>
+        )}
 
-      {/* EMAIL */}
-      <Text style={ComponentTextStyles.loginLabel}>Email:</Text>
-      <TextInput
-        style={ComponentStyles.loginInput}
-        value={email}
-        onChangeText={setEmail}
-      />
-
-      {/* PASSWORD */}
-      <Text style={ComponentTextStyles.loginLabel}>Password :</Text>
-      <View style={ComponentStyles.passwordWrapper}>
+        {/* --- Username --- */}
+        <Text style={ComponentTextStyles.loginLabel}>Username :</Text>
         <TextInput
-          secureTextEntry={!showPassword}
-          style={ComponentStyles.passwordInput}
-          value={password}
-          onChangeText={setPassword}
+          style={ComponentStyles.loginInput}
+          value={username}
+          onChangeText={setUsername}
+          placeholder="Min. 3 karakter, tanpa spasi"
+          autoCapitalize="none"
+          editable={!loading}
         />
-        <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
-          <Ionicons
-            name={showPassword ? "eye-off-outline" : "eye-outline"}
-            size={20}
-            color="#333"
+
+        {/* --- Email --- */}
+        <Text style={ComponentTextStyles.loginLabel}>Email :</Text>
+        <TextInput
+          style={ComponentStyles.loginInput}
+          value={email}
+          onChangeText={setEmail}
+          placeholder="contoh@tobafarm.com"
+          keyboardType="email-address"
+          autoCapitalize="none"
+          editable={!loading}
+        />
+
+        {/* --- Password --- */}
+        <Text style={ComponentTextStyles.loginLabel}>Password :</Text>
+        <View style={ComponentStyles.passwordWrapper}>
+          <TextInput
+            secureTextEntry={!showPassword}
+            style={ComponentStyles.passwordInput}
+            value={password}
+            onChangeText={setPassword}
+            placeholder="Min. 8 karakter (A-z, 0-9)"
+            editable={!loading}
           />
-        </TouchableOpacity>
-      </View>
+          <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
+            <Ionicons
+              name={showPassword ? "eye-off-outline" : "eye-outline"}
+              size={20}
+              color="#333"
+            />
+          </TouchableOpacity>
+        </View>
 
-      {/* CONFIRM PASSWORD */}
-      <Text style={ComponentTextStyles.loginLabel}>Konfirmasi Password :</Text>
-      <View style={ComponentStyles.passwordWrapper}>
-        <TextInput
-          secureTextEntry={!showConfirmPassword}
-          style={ComponentStyles.passwordInput}
-          value={confirm}
-          onChangeText={setConfirm}
-        />
+        {/* --- Confirm Password --- */}
+        <Text style={ComponentTextStyles.loginLabel}>Konfirmasi Password :</Text>
+        <View style={ComponentStyles.passwordWrapper}>
+          <TextInput
+            secureTextEntry={!showPassword}
+            style={ComponentStyles.passwordInput}
+            value={confirm}
+            onChangeText={setConfirm}
+            placeholder="Ulangi password"
+            editable={!loading}
+          />
+          {/* Tombol eye ini juga mengontrol keduanya */}
+          <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
+            <Ionicons
+              name={showPassword ? "eye-off-outline" : "eye-outline"}
+              size={20}
+              color="#333"
+            />
+          </TouchableOpacity>
+        </View>
+
+        {/* --- Footer Link --- */}
+        <Text style={ComponentTextStyles.registerText}>
+          Sudah memiliki akun?{" "}
+          <Text
+            style={ComponentTextStyles.registerHighlight}
+            onPress={() => !loading && router.push("/login")}
+          >
+            Masuk
+          </Text>
+        </Text>
+
+        {/* --- Submit Button --- */}
         <TouchableOpacity
-          onPress={() => setShowConfirmPassword(!showConfirmPassword)}
+          style={[ComponentStyles.loginSubmitButton, loading && { opacity: 0.7 }]}
+          onPress={onSubmit}
+          disabled={loading}
         >
-          <Ionicons
-            name={showConfirmPassword ? "eye-off-outline" : "eye-outline"}
-            size={20}
-            color="#333"
-          />
+          {loading ? (
+            <ActivityIndicator color={Colors.white} />
+          ) : (
+            <Text style={ComponentTextStyles.loginSubmitText}>Daftar Sekarang</Text>
+          )}
         </TouchableOpacity>
       </View>
-
-      {/* LOGIN LINK */}
-      <Text style={ComponentTextStyles.registerText}>
-        Sudah memiliki akun?{" "}
-        <Text
-          style={ComponentTextStyles.registerHighlight}
-          onPress={() => router.push("/login")}
-        >
-          Masuk
-        </Text>
-        , sekarang juga!
-      </Text>
-
-      {/* SUBMIT */}
-      <TouchableOpacity
-        style={ComponentStyles.loginSubmitButton}
-        onPress={onSubmit}
-        disabled={loading}
-      >
-        <Text style={ComponentTextStyles.loginSubmitText}>
-          {loading ? "Loading..." : "Sign Up"}
-        </Text>
-      </TouchableOpacity>
-    </View>
+    </ScrollView>
   );
 }

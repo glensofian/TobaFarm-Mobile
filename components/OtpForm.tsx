@@ -2,8 +2,15 @@ import { OTPCreate, OTPInput } from "@/types/otp";
 import axios from "axios";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useRef, useState } from "react";
-import { Text, TextInput, TouchableOpacity, View } from "react-native";
-import { ComponentStyles, ComponentTextStyles } from "../styles";
+import {
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+  Keyboard,
+  ActivityIndicator,
+} from "react-native";
+import { ComponentStyles, ComponentTextStyles, Colors } from "../styles";
 
 export default function OtpForm() {
   const router = useRouter();
@@ -11,12 +18,12 @@ export default function OtpForm() {
   const email = params.email || "";
   const user_id = params.user_id || "";
 
-  const [otp, setOtp] = useState("");
+  const [otp, setOtp] = useState(["", "", "", "", "", ""]);
   const [loading, setLoading] = useState(false);
-  const [resendLoading, setResendLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
 
+  const inputs = useRef<TextInput[]>([]);
   const hasFetched = useRef(false);
 
   useEffect(() => {
@@ -29,86 +36,70 @@ export default function OtpForm() {
   const onLoad = async () => {
     setError(null);
     setInfo(null);
-
-    const lang = "id"; // Default or get from global state
-
-    const payload: OTPCreate = {
-      email,
-      user_id: user_id || null,
-      lang,
-    };
-
-    console.log(payload);
-
     try {
+      const payload: OTPCreate = {
+        email,
+        user_id: user_id || null,
+        lang: "id",
+      };
+
       const response = await axios.post(
         `${process.env.EXPO_PUBLIC_TOFA_API_URL}/otp`,
         payload,
       );
 
-      if (response.status !== 200) {
-        setError("Gagal mengirim OTP. Silakan coba lagi.");
-        return;
+      if (response.status === 200) {
+        setInfo(`OTP Berhasil Dikirim ke ${email}`);
       }
-
-      setInfo("Kode OTP berhasil dikirim.");
     } catch (error) {
       setError("Gagal mengirim OTP. Coba lagi.");
     }
   };
 
+  const handleChange = (text: string, index: number) => {
+    const newOtp = [...otp];
+    newOtp[index] = text;
+    setOtp(newOtp);
+
+    if (text && index < 5) {
+      inputs.current[index + 1].focus();
+    }
+  };
+
+  const handleKeyPress = (e: any, index: number) => {
+    if (e.nativeEvent.key === "Backspace" && !otp[index] && index > 0) {
+      inputs.current[index - 1].focus();
+    }
+  };
+
   const onSubmit = async () => {
     setError(null);
-    setInfo(null);
+    const code = otp.join("");
 
-    const code = otp.replace(/\s/g, "");
-
-    if (!code) {
-      setError("Kode OTP wajib diisi.");
-      return;
-    }
     if (code.length < 6) {
-      setError("Kode OTP minimal 6 digit.");
+      setError("Kode OTP harus 6 digit.");
       return;
     }
 
     try {
-      const payload: OTPInput = {
-        email: email,
-        otp: code,
-      };
+      setLoading(true);
+      const payload: OTPInput = { email, otp: code };
 
-      const response = await axios.post(
+      await axios.post(
         `${process.env.EXPO_PUBLIC_TOFA_API_URL}/otp/verify`,
         payload,
       );
 
-      if (response.status !== 200) {
-        setError("Gagal verifikasi OTP. Silakan coba lagi.");
-        return;
-      }
-
-      setInfo("Kode OTP berhasil diverifikasi.");
-
-      const verifyRegistrationResponse = await axios.post(
+      await axios.post(
         `${process.env.EXPO_PUBLIC_TOFA_API_URL}/auth/verify`,
         payload,
       );
 
-      if (verifyRegistrationResponse.status !== 200) {
-        setError("Gagal verifikasi OTP. Silakan coba lagi.");
-        return;
-      }
-
-      setInfo("Kode OTP berhasil diverifikasi.");
-
-      setLoading(true);
-
-      await new Promise((r) => setTimeout(r, 600));
-
-      // Setelah OTP berhasil, arahkan ke login (atau langsung chat jika flow Anda begitu)
-      router.push("/login");
-    } catch {
+      Keyboard.dismiss();
+      setInfo("Verifikasi Berhasil!");
+      await new Promise((r) => setTimeout(r, 800));
+      router.replace("/login");
+    } catch (err: any) {
       setError("Kode OTP tidak valid atau sudah kadaluarsa.");
     } finally {
       setLoading(false);
@@ -116,74 +107,91 @@ export default function OtpForm() {
   };
 
   const onResend = async () => {
-    setError(null);
-    setInfo(null);
-
-    try {
-      setResendLoading(true);
-
-      // TODO: panggil API resend OTP
-      // await authApi.resendOtp({ identifier });
-
-      await new Promise((r) => setTimeout(r, 600));
-      setInfo("Kode OTP baru sudah dikirim.");
-    } catch {
-      setError("Gagal mengirim ulang OTP. Coba lagi.");
-    } finally {
-      setResendLoading(false);
-    }
+    setOtp(["", "", "", "", "", ""]);
+    inputs.current[0].focus();
+    await onLoad();
   };
 
   return (
     <View style={ComponentStyles.loginCard}>
-      {/* OTP */}
-      <Text style={ComponentTextStyles.loginLabel}>
-        Verification / Kode OTP :
+      {/* --- Header --- */}
+      <Text
+        style={[
+          ComponentTextStyles.loginLabel,
+          { textAlign: "center", marginBottom: 20 },
+        ]}
+      >
+        Masukkan 6 Digit Kode Verifikasi
       </Text>
 
-      <TextInput
-        keyboardType="number-pad"
-        maxLength={6}
-        style={ComponentStyles.loginInput}
-        value={otp}
-        onChangeText={setOtp}
-        placeholder="123456"
-      />
+      {/* --- OTP Inputs --- */}
+      <View style={ComponentStyles.otpContainer}>
+        {otp.map((digit, index) => (
+          <TextInput
+            key={index}
+            ref={(el) => (inputs.current[index] = el!)}
+            style={[
+              ComponentStyles.otpInputBox,
+              digit ? ComponentStyles.otpInputBoxActive : null,
+            ]}
+            keyboardType="number-pad"
+            maxLength={1}
+            value={digit}
+            onChangeText={(text) => handleChange(text, index)}
+            onKeyPress={(e) => handleKeyPress(e, index)}
+            editable={!loading}
+          />
+        ))}
+      </View>
 
+      {/* --- Status Message --- */}
       {error && (
-        <Text style={{ color: "red", marginBottom: 10, textAlign: "center" }}>
+        <Text
+          style={[ComponentTextStyles.registerErrorText, { marginBottom: 15 }]}
+        >
           {error}
         </Text>
       )}
       {info && (
-        <Text style={{ color: "green", marginBottom: 10, textAlign: "center" }}>
+        <Text
+          style={{
+            color: "green",
+            marginBottom: 15,
+            textAlign: "center",
+            fontSize: 12,
+            fontWeight: "500",
+          }}
+        >
           {info}
         </Text>
       )}
 
-      {/* CONTINUE */}
+      {/* --- Action Button --- */}
       <TouchableOpacity
         style={[ComponentStyles.loginSubmitButton, loading && { opacity: 0.7 }]}
         onPress={onSubmit}
         disabled={loading}
       >
-        <Text style={ComponentTextStyles.loginSubmitText}>
-          {loading ? "Verifying..." : "Continue"}
-        </Text>
+        {loading ? (
+          <ActivityIndicator color="#FFF" />
+        ) : (
+          <Text style={ComponentTextStyles.loginSubmitText}>
+            Verifikasi Sekarang
+          </Text>
+        )}
       </TouchableOpacity>
 
-      {/* RESEND */}
-      <Text
-        style={[
-          ComponentTextStyles.registerText,
-          ComponentTextStyles.otpResendText,
-        ]}
+      {/* --- Resend --- */}
+      <TouchableOpacity
+        onPress={onResend}
+        disabled={loading}
+        style={{ marginTop: 20 }}
       >
-        Belum mendapatkan Kode?{" "}
-        <Text style={ComponentTextStyles.registerHighlight} onPress={onResend}>
-          Kirim Ulang
+        <Text style={ComponentTextStyles.registerText}>
+          Belum mendapatkan kode?{" "}
+          <Text style={ComponentTextStyles.registerHighlight}>Kirim Ulang</Text>
         </Text>
-      </Text>
+      </TouchableOpacity>
     </View>
   );
 }
