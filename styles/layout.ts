@@ -24,6 +24,7 @@ export const Layout = StyleSheet.create({
   },
 
   loginContainer: {
+    flex: 1,
     flexGrow: 1,
     alignItems: 'center',
     justifyContent: 'center',
@@ -32,6 +33,7 @@ export const Layout = StyleSheet.create({
   },
 
   loginLogoWrapper: {
+    marginTop: verticalScale(48),
     marginBottom: verticalScale(10),
     alignItems: 'center',
   },
@@ -45,6 +47,8 @@ export const Layout = StyleSheet.create({
 
   loginFormWrapper: {
     width: '100%',
+    paddingHorizontal: scale(16),
+    transform: [{ translateY: verticalScale(-20) }],
   },
 
   /* ===== ChatScreen ===== */

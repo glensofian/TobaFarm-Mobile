@@ -17,19 +17,16 @@ import { ComponentStyles, ComponentTextStyles, Colors } from "../styles";
 
 export default function RegisterForm() {
   const router = useRouter();
-  
-  // Konsep: Satu state untuk mengontrol kedua field password
   const [showPassword, setShowPassword] = useState(false);
-  
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
-  
   const [loading, setLoading] = useState(false);
+
   const [error, setError] = useState<string | null>(null);
 
-  // --- Logic Form Submission ---
   const onSubmit = async () => {
     setError(null);
     Keyboard.dismiss();
@@ -43,19 +40,23 @@ export default function RegisterForm() {
       setError("Semua field wajib diisi.");
       return;
     }
-    if (un.includes(" ")) {
-      setError("Username tidak boleh mengandung spasi.");
-      return;
-    }
+
     if (un.length < 3) {
       setError("Username minimal 3 karakter.");
       return;
     }
+
+    if (un.includes(" ")) {
+      setError("Username tidak boleh mengandung spasi.");
+      return;
+    }
+
     if (!em.includes("@")) {
       setError("Format email tidak valid.");
       return;
     }
-    if (pw.length < 8) {
+    
+ if (pw.length < 8) {
       setError("Password minimal 8 karakter.");
       return;
     }
@@ -67,6 +68,7 @@ export default function RegisterForm() {
       setError("Password harus ada minimal satu angka.");
       return;
     }
+
     if (pw !== cf) {
       setError("Konfirmasi password tidak sama.");
       return;
@@ -94,6 +96,7 @@ export default function RegisterForm() {
           lang: "id",
         };
 
+
         await new Promise((r) => setTimeout(r, 600));
 
         router.push({
@@ -111,7 +114,6 @@ export default function RegisterForm() {
       setLoading(false);
     }
   };
-
   return (
     <ScrollView 
       showsVerticalScrollIndicator={false} 
@@ -182,6 +184,7 @@ export default function RegisterForm() {
           />
           {/* Tombol eye ini juga mengontrol keduanya */}
           <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
+
             <Ionicons
               name={showPassword ? "eye-off-outline" : "eye-outline"}
               size={20}
@@ -199,6 +202,7 @@ export default function RegisterForm() {
           >
             Masuk
           </Text>
+
         </Text>
 
         {/* --- Submit Button --- */}

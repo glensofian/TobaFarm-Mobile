@@ -18,12 +18,13 @@ export default function OtpForm() {
   const email = params.email || "";
   const user_id = params.user_id || "";
 
-  const [otp, setOtp] = useState(["", "", "", "", "", ""]);
+  const [otp, setOtp] = useState(["", "", "", "", "", ""]); 
   const [loading, setLoading] = useState(false);
+  const [resendLoading, setResendLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
-
   const inputs = useRef<TextInput[]>([]);
+
   const hasFetched = useRef(false);
 
   useEffect(() => {
@@ -36,12 +37,15 @@ export default function OtpForm() {
   const onLoad = async () => {
     setError(null);
     setInfo(null);
+
     try {
       const payload: OTPCreate = {
         email,
         user_id: user_id || null,
         lang: "id",
       };
+
+      console.log(payload);
 
       const response = await axios.post(
         `${process.env.EXPO_PUBLIC_TOFA_API_URL}/otp`,
@@ -51,6 +55,12 @@ export default function OtpForm() {
       if (response.status === 200) {
         setInfo(`OTP Berhasil Dikirim ke ${email}`);
       }
+
+      if (response.status !== 200) {
+        setError("Gagal mengirim OTP. Silakan coba lagi.");
+        return;
+      }
+
     } catch (error) {
       setError("Gagal mengirim OTP. Coba lagi.");
     }
@@ -74,10 +84,11 @@ export default function OtpForm() {
 
   const onSubmit = async () => {
     setError(null);
+
     const code = otp.join("");
 
     if (code.length < 6) {
-      setError("Kode OTP harus 6 digit.");
+      setError("Kode OTP minimal 6 digit.");
       return;
     }
 
@@ -85,21 +96,37 @@ export default function OtpForm() {
       setLoading(true);
       const payload: OTPInput = { email, otp: code };
 
-      await axios.post(
+      const response = await axios.post(
         `${process.env.EXPO_PUBLIC_TOFA_API_URL}/otp/verify`,
         payload,
       );
 
-      await axios.post(
+      if (response.status !== 200) {
+        setError("Gagal verifikasi OTP. Silakan coba lagi.");
+        return;
+      }
+
+      setInfo("Kode OTP berhasil diverifikasi.");
+
+      const verifyRegistrationResponse = await axios.post(
         `${process.env.EXPO_PUBLIC_TOFA_API_URL}/auth/verify`,
         payload,
       );
 
-      Keyboard.dismiss();
-      setInfo("Verifikasi Berhasil!");
-      await new Promise((r) => setTimeout(r, 800));
-      router.replace("/login");
-    } catch (err: any) {
+      if (verifyRegistrationResponse.status !== 200) {
+        setError("Gagal verifikasi OTP. Silakan coba lagi.");
+        return;
+      }
+
+      setInfo("Kode OTP berhasil diverifikasi.");
+
+      setLoading(true);
+
+      await new Promise((r) => setTimeout(r, 600));
+
+      // Setelah OTP berhasil, arahkan ke login (atau langsung chat jika flow Anda begitu)
+      router.push("/login");
+    } catch {
       setError("Kode OTP tidak valid atau sudah kadaluarsa.");
     } finally {
       setLoading(false);
@@ -107,12 +134,14 @@ export default function OtpForm() {
   };
 
   const onResend = async () => {
-    setOtp(["", "", "", "", "", ""]);
-    inputs.current[0].focus();
-    await onLoad();
+    try {
+      setResendLoading(true);
+      await onLoad();
+    } finally {
+      setResendLoading(false);
+    }
   };
-
-  return (
+ return (
     <View style={ComponentStyles.loginCard}>
       {/* --- Header --- */}
       <Text
@@ -129,7 +158,9 @@ export default function OtpForm() {
         {otp.map((digit, index) => (
           <TextInput
             key={index}
-            ref={(el) => (inputs.current[index] = el!)}
+            ref={(el) => {
+              if (el) inputs.current[index] = el;
+            }}
             style={[
               ComponentStyles.otpInputBox,
               digit ? ComponentStyles.otpInputBoxActive : null,
@@ -186,10 +217,12 @@ export default function OtpForm() {
         onPress={onResend}
         disabled={loading}
         style={{ marginTop: 20 }}
+
       >
         <Text style={ComponentTextStyles.registerText}>
           Belum mendapatkan kode?{" "}
           <Text style={ComponentTextStyles.registerHighlight}>Kirim Ulang</Text>
+
         </Text>
       </TouchableOpacity>
     </View>

@@ -16,13 +16,13 @@ import { nowIso } from '@/utils/date';
 import { getValueFor, save } from '@/utils/storage';
 import { truncateTitle } from '@/utils/truncateTitle';
 import { uid } from '@/utils/uid';
-import { Colors, Layout, ComponentStyles, ComponentTextStyles } from '../styles'; 
+import { Colors, Layout, ComponentStyles, ComponentTextStyles } from '../styles';
 
 import { createConversationsApi } from '@/api/conversationsApi';
 import DownloadModel from '@/components/DownloadModel';
 import { useNetwork } from '@/context/NetworkContext';
 import { useNetworkStatus } from '@/hooks/useNetworkStatus';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import NoInternetModal from '../components/NoInternetModal';
 import { MODEL_CONFIG } from '../constants/modelConfig';
 import { models } from '../constants/models';
@@ -30,15 +30,12 @@ import { ChatRepository } from '../data/repositories/ChatRepository';
 import { useRAG, MemoryVectorStore } from 'react-native-rag';
 import {
   ExecuTorchEmbeddings,
-  ExecuTorchLLM,
 } from '@react-native-rag/executorch';
 import {
   ALL_MINILM_L6_V2,
-  // ALL_MINILM_L6_V2_TOKENIZER,
-  LLAMA3_2_1B_QLORA,
-  // LLAMA3_2_TOKENIZER,
-  // LLAMA3_2_TOKENIZER_CONFIG,
 } from 'react-native-executorch';
+import { LlamaRNWrapper } from '../utils/LlamaRNWrapper';
+import { loadKnowledgeBase } from '../utils/knowledgeLoader';
 
 const getToken = async () => {
   return await getValueFor("token");
@@ -60,6 +57,8 @@ const makeUserMsg = (text: string): Message => ({
 });
 
 
+// --- Moved inside RoomChat to handle late initialization ---
+
 
 export default function RoomChat() {
   const { prompt } = useLocalSearchParams<{ prompt?: string }>();
@@ -72,6 +71,47 @@ export default function RoomChat() {
   const { isInternetReachable, isConnected } = useNetwork();
   const { isConnected: isNetworkConnected, justDisconnected, justConnected } = useNetworkStatus();
   const [mode, setMode] = useState<"online" | "offline">("online");
+  const [initializationError, setInitializationError] = useState<string | null>(null);
+
+  // Debugging logs for URL constants
+  useEffect(() => {
+    console.log("DEBUG ExecuTorch Constants (Stringified):", JSON.stringify({
+      ALL_MINILM_L6_V2,
+    }, null, 2));
+  }, []);
+
+  const vectorStore = useMemo(() => {
+    try {
+      console.log("Instantiating MemoryVectorStore with constants...");
+      
+      const modelSource = ALL_MINILM_L6_V2?.modelSource || "https://huggingface.co/software-mansion/react-native-executorch-all-MiniLM-L6-v2/resolve/v0.5.0/all-MiniLM-L6-v2_xnnpack.pte";
+      const tokenizerSource = ALL_MINILM_L6_V2?.tokenizerSource || "https://huggingface.co/software-mansion/react-native-executorch-all-MiniLM-L6-v2/resolve/v0.5.0/tokenizer.json";
+
+      return new MemoryVectorStore({
+        embeddings: new ExecuTorchEmbeddings({
+          modelSource,
+          tokenizerSource,
+        } as any),
+      });
+    } catch (err: any) {
+      const msg = `VectorStore Init Error: ${err.message || String(err)}`;
+      console.error(msg);
+      setInitializationError(msg);
+      return null;
+    }
+  }, []);
+
+  const llm = useMemo(() => {
+    try {
+      console.log("Instantiating LlamaRNWrapper...");
+      return new LlamaRNWrapper();
+    } catch (err: any) {
+      const msg = `LLM Init Error: ${err.message || String(err)}`;
+      console.error(msg);
+      setInitializationError(msg);
+      return null;
+    }
+  }, []);
   const [isModalDismissed, setIsModalDismissed] = useState(false);
   const [isOfflineModelDownloaded, setIsOfflineModelDownloaded] = useState(false);
 
@@ -85,9 +125,28 @@ export default function RoomChat() {
     }
   }, []);
 
+  const [isKnowledgeBaseLoaded, setIsKnowledgeBaseLoaded] = useState(false);
+
   useEffect(() => {
     checkOfflineModel();
   }, [checkOfflineModel]);
+
+  // Seed Knowledge Base once vector store is ready
+  useEffect(() => {
+    if (vectorStore && llm && !isKnowledgeBaseLoaded) {
+      const init = async () => {
+        // Load the Vector Store (initializes dimension)
+        await loadKnowledgeBase(vectorStore);
+        // Load the LLM into memory
+        await llm.load();
+        setIsKnowledgeBaseLoaded(true);
+      };
+      
+      init().catch(err => {
+        console.error("Failed to seed knowledge base or load model:", err);
+      });
+    }
+  }, [vectorStore, llm, isKnowledgeBaseLoaded]);
 
   const api = useMemo(() => createConversationsApi(), []);
 
@@ -102,7 +161,8 @@ export default function RoomChat() {
   const [messagesByConversation, setMessagesByConversation] = useState<Record<string, Message[]>>({});
   const [activeConversationId, setActiveConversationId] = useState("");
 
-  const availableModels = models
+  const availableModels = models;
+
   // --- Derived
   const filteredConversations = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
@@ -117,18 +177,19 @@ export default function RoomChat() {
   const menuRef = useRef(null);
   const searchInputRef = useRef(null);
 
-  // Handle Back After Log in
+    // Handle Back After Log in
   useEffect(() => {
-  const backAction = () => {
-    return true; 
-  };
+    const backAction = () => {
+      return true; 
+    };
 
-  const backHandler = BackHandler.addEventListener(
-    'hardwareBackPress',
-    backAction
-  );
-  return () => backHandler.remove();
-}, []);
+    const backHandler = BackHandler.addEventListener(
+      'hardwareBackPress',
+      backAction
+    );
+    return () => backHandler.remove();
+  }, []);
+
 
   /* =======================
    HANDLERS
@@ -144,16 +205,18 @@ export default function RoomChat() {
       console.warn("Could not load server conversations:", e);
     }
 
-    // 2. Load Local (Try but don't crash)
+    // 2. Load local-only (unsynced) conversations.
+    // Synced ones were deleted from SQLite after sync, so this only shows offline-created ones.
     try {
       localLoaded = await ChatRepository.getAllConversations();
     } catch (e) {
       console.error("Could not load local conversations:", e);
     }
 
-    // 3. Merge and deduplicate
+    // 3. Merge: server list first, then local-only (offline-created)
     const combined = [...serverLoaded];
     localLoaded.forEach(lc => {
+      // Only add if not already represented by server_id
       if (!combined.find(s => s.id === lc.id || s.id === lc.server_id)) {
         combined.push({
           id: lc.id,
@@ -170,24 +233,9 @@ export default function RoomChat() {
     if (!cid || cid.startsWith("temp-")) return;
 
     try {
-      // 1. Try local first
-      const localMsgs = await ChatRepository.getMessagesByConversation(cid);
-      if (localMsgs.length > 0) {
-        setMessagesByConversation((prev) => ({
-          ...prev,
-          [cid]: localMsgs.map(m => ({
-            id: m.id,
-            role: m.role === 'assistant' ? 'bot' : 'user' as any,
-            text: m.content,
-            createdAt: new Date(m.created_at).toISOString()
-          })),
-        }));
-      }
-
-      // 2. If online, fetch from API
       if (isInternetReachable) {
+        // --- ONLINE: API is the source of truth ---
         const conv = await ChatRepository.getConversation(cid);
-        // Only fetch from API if we have a server_id OR if it's not a local UUID (likely a server ID from loadConversations)
         const isLocalUuid = cid.includes('-') && cid.length > 20;
         const targetId = conv?.server_id || (!conv && !isLocalUuid ? cid : null);
 
@@ -199,14 +247,29 @@ export default function RoomChat() {
                 ...prev,
                 [cid]: serverMsgs,
               }));
+              return; // Done — skip SQLite
             }
           } catch (apiErr: any) {
-            // Silence 404s if it's a recently created local chat that hasn't synced yet
+            // Silence 404 — conversation may not exist on server yet
             if (apiErr?.response?.status !== 404) {
-              throw apiErr;
+              console.warn("API message fetch error:", apiErr);
             }
           }
         }
+      }
+
+      // --- OFFLINE or API returned nothing: Fall back to SQLite ---
+      const localMsgs = await ChatRepository.getMessagesByConversation(cid);
+      if (localMsgs.length > 0) {
+        setMessagesByConversation((prev) => ({
+          ...prev,
+          [cid]: localMsgs.map(m => ({
+            id: m.id,
+            role: m.role === 'assistant' ? 'bot' : 'user' as any,
+            text: m.content,
+            createdAt: new Date(m.created_at).toISOString()
+          })),
+        }));
       }
     } catch (e) {
       console.warn("Load messages notice:", e);
@@ -282,6 +345,11 @@ export default function RoomChat() {
     };
     init();
   }, []);
+
+  /* =======================
+     RAG SEEDING (AUTO-INITIALIZE)
+  ======================== */
+
 
 
   /* =======================
@@ -461,15 +529,20 @@ export default function RoomChat() {
     async (cid: string, fullText: string) => {
       let targetId = cid;
 
-      // Check if it's a temp ID and resolve to real ID
+      // Check if it's a temp ID and resolve to real ID (only for online chats)
       if (cid.startsWith("temp-")) {
-        targetId = tempIdMapRef.current[cid] || "";
-
-        // Retry if mapping not ready yet (race condition)
-        if (!targetId) {
-          console.log("Waiting for real ID mapping...", cid);
-          await new Promise(r => setTimeout(r, 1000));
+        // For offline model, we keep the temp- ID as it's our only local ID
+        if (selectedModel === 'tofa-offline') {
+          targetId = cid;
+        } else {
           targetId = tempIdMapRef.current[cid] || "";
+
+          // Retry if mapping not ready yet (race condition)
+          if (!targetId) {
+            console.log("Waiting for real ID mapping...", cid);
+            await new Promise(r => setTimeout(r, 1000));
+            targetId = tempIdMapRef.current[cid] || "";
+          }
         }
       }
 
@@ -482,12 +555,18 @@ export default function RoomChat() {
       try {
         if (!fullText) return;
         if (selectedModel === 'tofa-offline') {
-          await ChatRepository.saveMessage({
-            conversation_id: targetId,
-            role: 'assistant',
-            content: fullText,
-            is_synced: false
-          });
+          if (isInternetReachable) {
+            // ONLINE with OFFLINE MODEL: Save to API directly
+            api.saveMessage(targetId, "assistant", fullText).catch(e => console.warn("API AI save failed:", e));
+          } else {
+            // STRICTLY OFFLINE: Save to SQLite
+            await ChatRepository.saveMessage({
+              conversation_id: targetId,
+              role: 'assistant',
+              content: fullText,
+              is_synced: false
+            });
+          }
         } else {
           await api.saveMessage(targetId, "assistant", fullText);
         }
@@ -504,12 +583,14 @@ export default function RoomChat() {
     getActiveConversationId,
     onToken: onWsToken,
     onDone: onWsDone,
+    vectorStore,
+    llm,
   });
 
   const handleStop = () => {
     ws.stop();
     setIsSending(false);
-  }
+  };
 
   const onSend = async (e?: React.FormEvent, overrideText?: string) => {
     if (e) e.preventDefault();
@@ -528,6 +609,23 @@ export default function RoomChat() {
         { id: threadId, title: truncateTitle(text, 28), createdAt: nowIso() },
         ...prev,
       ]);
+
+      // 1b. Save the conversation locally if offline so it exists for the message FK
+      if (selectedModel === 'tofa-offline') {
+        const now = Date.now();
+        try {
+          console.log("[Offline] Pre-saving conversation to DB:", threadId);
+          await ChatRepository.saveConversation({
+            id: threadId,
+            title: truncateTitle(text, 28),
+            created_at: now,
+            is_synced: false
+          });
+          console.log("[Offline] Conversation saved successfully.");
+        } catch (err) {
+          console.error("Failed to save new chat locally:", err);
+        }
+      }
     }
 
     // 2. Optimistic UI update
@@ -544,22 +642,41 @@ export default function RoomChat() {
       : text;
     const isOffline = selectedModel === 'tofa-offline';
 
-    // 4. Save User Message Locally if offline
+    // 4. Save User Message
     if (isOffline) {
-      try {
-        await ChatRepository.saveMessage({
-          conversation_id: threadId,
-          role: 'user',
-          content: text,
-          is_synced: false
-        });
-      } catch (e) {
-        console.error("Failed to save user message locally:", e);
+      if (isInternetReachable) {
+        // ONLINE with OFFLINE MODEL: Save to API directly (no need for SQLite)
+        api.saveMessage(threadId, "user", text).catch(e => console.warn("API save failed:", e));
+      } else {
+        // STRICTLY OFFLINE: Save to SQLite
+        try {
+          // 4a. Ensure the parent conversation exists in local SQLite 
+          const exists = await ChatRepository.getConversation(threadId);
+          if (!exists) {
+            console.log("[Offline] Materializing conversation in local DB:", threadId);
+            const currentConv = conversations.find(c => c.id === threadId);
+            await ChatRepository.saveConversation({
+              id: threadId,
+              title: currentConv?.title || "Percakapan",
+              created_at: Date.now(),
+              is_synced: false,
+            });
+          }
+
+          await ChatRepository.saveMessage({
+            conversation_id: threadId,
+            role: 'user',
+            content: text,
+            is_synced: false
+          });
+        } catch (e) {
+          console.error("Failed to save user message locally:", e);
+        }
       }
     }
 
     const wsOk = await ws.send(wsText, threadId);
-    if (!wsOk) {
+    if (!wsOk && !isOffline) {
       alert("Gagal mengirim pesan. Pastikan koneksi atau model sudah siap.");
       setIsSending(false);
       return;
@@ -594,10 +711,12 @@ export default function RoomChat() {
     }
 
     // 5. Save user message to backend (async)
-    try {
-      await api.saveMessage(threadId, "user", text);
-    } catch (e) {
-      console.error("Failed to save user message:", e);
+    if (!isOffline) {
+      try {
+        await api.saveMessage(threadId, "user", text);
+      } catch (e) {
+        console.error("Failed to save user message:", e);
+      }
     }
 
     // 5. Update title if it was still using default
@@ -622,8 +741,7 @@ export default function RoomChat() {
   const handleShowDownloadModel = () => {
     setModelsModalVisible(false);
     setDownloadModelVisible(true);
-
-  }
+  };
 
   return (
     <SafeAreaView
@@ -632,6 +750,25 @@ export default function RoomChat() {
         { backgroundColor: Colors.backgroundPrimary },
       ]}
     >
+      {initializationError && (
+        <View style={{
+          backgroundColor: '#ffebee',
+          padding: 10,
+          borderBottomWidth: 1,
+          borderBottomColor: '#ef5350',
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between'
+        }}>
+          <Text style={{ color: '#c62828', fontSize: 12, flex: 1 }}>
+            ⚠️ {initializationError}
+          </Text>
+          <TouchableOpacity onPress={() => setInitializationError(null)}>
+            <Ionicons name="close-circle" size={20} color="#c62828" />
+          </TouchableOpacity>
+        </View>
+      )}
+
       {/* ===== SIDEBAR ===== */}
       <Sidebar
         user={user}
@@ -660,7 +797,9 @@ export default function RoomChat() {
       />
 
       {/* ===== HEADER ===== */}
-      <View style={ComponentStyles.roomChatHeader}>
+      <View
+        style={ComponentStyles.roomChatHeader}
+      >
         <TouchableOpacity onPress={() => setSidebarOpen(!sidebarOpen)}>
           {sidebarOpen ? (
             <Ionicons name="menu" size={22} color={Colors.black} />
@@ -674,7 +813,9 @@ export default function RoomChat() {
             onPress={() => setModelsModalVisible(!modelsModalVisible)}
             style={ComponentStyles.roomChatDropdownTrigger}
           >
-            <Text style={ComponentTextStyles.roomChatHeaderTitle}>
+            <Text
+              style={ComponentTextStyles.roomChatHeaderTitle}
+            >
               TobaFarm
             </Text>
             <Ionicons name="chevron-down-outline" size={20} color={Colors.white} />
@@ -699,21 +840,13 @@ export default function RoomChat() {
                     }}
                     style={[
                       ComponentStyles.dropdownItem,
-                      {
-                        backgroundColor: selectedModel === model.id ? '#f5f5f5' : 'transparent',
-                        opacity: isOnlineDisabled ? 0.5 : 1,
-                      }
+                      { backgroundColor: selectedModel === model.id ? '#f5f5f5' : 'transparent' },
+                      { opacity: isOnlineDisabled ? 0.5 : 1 },
                     ]}
                   >
                     <View style={ComponentStyles.dropdownItemRow}>
                       <View style={ComponentStyles.dropdownItemContent}>
-                        <Text style={[
-                          ComponentTextStyles.dropdownModelName,
-                          {
-                            color: isOnlineDisabled ? '#888' : (selectedModel === model.id ? Colors.backgroundPrimary : '#333'),
-                            fontWeight: selectedModel === model.id ? '600' : '400'
-                          }
-                        ]}>
+                        <Text style={ComponentTextStyles.dropdownModelName}>
                           {model.label}
                         </Text>
                         {isOnlineDisabled && (
@@ -732,7 +865,6 @@ export default function RoomChat() {
 
               {availableModels.filter(m => m.type === 'offline').map((model) => {
                 const isDownloaded = model.id === 'tofa-offline' ? isOfflineModelDownloaded : true;
-
                 return (
                   <View
                     key={model.id}
@@ -747,15 +879,13 @@ export default function RoomChat() {
                         setSelectedModel(model.id);
                         setModelsModalVisible(false);
                       }}
-                      style={{ flex: 1 }}
+                      style={{ flex: 1}}
                     >
-                      <View style={[ComponentStyles.dropdownOfflineInner, { opacity: isDownloaded ? 1 : 0.5 }]}>
+                      <View style={ComponentStyles.dropdownOfflineInner}>
                         <Text style={[
                           ComponentTextStyles.dropdownModelName,
-                          {
-                            color: selectedModel === model.id ? Colors.backgroundPrimary : '#333',
-                            fontWeight: selectedModel === model.id ? '600' : '400'
-                          }
+                          { color: selectedModel === model.id ? Colors.backgroundPrimary : '#333' },
+                          { fontWeight: selectedModel === model.id ? '600' : '400' }
                         ]}>
                           {model.label}
                         </Text>
@@ -799,7 +929,6 @@ export default function RoomChat() {
           onPress={() => setModelsModalVisible(false)}
         />
       )}
-
       {/* ===== CHAT LIST ===== */}
       <View style={ComponentStyles.chatListContainer}>
         {isSyncing && (
@@ -819,6 +948,7 @@ export default function RoomChat() {
           onSend={(text) => onSend(undefined, text)}
         />
       </View>
+
 
       <NoInternetModal
         visible={!isNetworkConnected && !isModalDismissed}

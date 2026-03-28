@@ -81,31 +81,31 @@ export const ComponentStyles = StyleSheet.create({
     alignItems: "center",
   },
 
-  /* ===== OTP BOX STYLES ===== */
-otpContainer: {
-  flexDirection: 'row',
-  justifyContent: 'space-between',
-  marginVertical: 20,
-  width: '100%',
-},
+   /* ===== OTP BOX STYLES ===== */
+  otpContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginVertical: 20,
+    width: '100%',
+  },
 
-otpInputBox: {
-  width: 42,
-  height: 52,
-  borderWidth: 1.5,
-  borderColor: Colors.borderInput,
-  borderRadius: 12,
-  textAlign: 'center',
-  fontSize: 22,
-  fontFamily: 'Montserrat-Bold',
-  backgroundColor: Colors.white,
-  color: Colors.black,
-},
+  otpInputBox: {
+    width: 42,
+    height: 52,
+    borderWidth: 1.5,
+    borderColor: Colors.borderInput,
+    borderRadius: 12,
+    textAlign: 'center',
+    fontSize: 22,
+    fontFamily: 'Montserrat-Bold',
+    backgroundColor: Colors.white,
+    color: Colors.black,
+  },
 
-otpInputBoxActive: {
-  borderColor: Colors.buttonPrimary,
-  backgroundColor: '#F9FAFB',
-},
+  otpInputBoxActive: {
+    borderColor: Colors.buttonPrimary,
+    backgroundColor: '#F9FAFB',
+  },
 
   /* ===== CHAT BUBBLE ===== */
   chatBubble: {

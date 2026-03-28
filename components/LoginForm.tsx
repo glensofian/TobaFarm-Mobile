@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import axios from "axios";
 import { useRouter } from "expo-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Text,
   TextInput,
@@ -22,7 +22,11 @@ export default function LoginForm() {
 
   const router = useRouter();
 
-  // --- Logic: Form Submission ---
+  useEffect(() => {
+    // setIdentifier("williamnapitupulu67@gmail.com");
+    // setPassword("Napit@123");
+  }, []);
+
   const onSubmit = async () => {
     setError(null);
     Keyboard.dismiss();
@@ -36,7 +40,7 @@ export default function LoginForm() {
     }
 
     if (!em.includes("@")) {
-      setError("Format email tidak valid.");
+      setError("Format email tidak valid.");      
       return;
     }
 
@@ -47,7 +51,8 @@ export default function LoginForm() {
         username: em,
         password: pw,
       });
-
+      console.log("Answer:");
+      console.log(process.env.EXPO_PUBLIC_TOFA_API_URL);
       const response = await axios.post(
         `${process.env.EXPO_PUBLIC_TOFA_API_URL}/auth/token`,
         payload.toString(),
@@ -58,11 +63,24 @@ export default function LoginForm() {
         },
       );
 
+      console.log("Response Status:");
+      console.log(response.status);
+
+      if (response.status !== 200) {
+        setError("Login gagal. Silakan coba lagi.");
+        return;
+      }
+
+      console.log("Response data:");
+      console.log(response.data);
+
       if (response.status === 200) {
         await save("token", response.data.access_token);
         await save("user", JSON.stringify(response.data.user));
 
+        console.log("Routing to roomchat");
         await new Promise((r) => setTimeout(r, 500));
+
         router.replace("/roomchat");
       }
     } catch (err: any) {
@@ -90,7 +108,7 @@ export default function LoginForm() {
 
   return (
     <View style={ComponentStyles.loginCard}>
-      {/* --- Error Display --- */}
+
       {error && (
         <Text
           style={{
@@ -118,7 +136,9 @@ export default function LoginForm() {
       />
 
       {/* --- Password Input --- */}
+
       <Text style={ComponentTextStyles.loginLabel}>Password :</Text>
+
       <View style={ComponentStyles.passwordWrapper}>
         <TextInput
           secureTextEntry={!showPassword}
@@ -145,8 +165,7 @@ export default function LoginForm() {
         Belum memiliki akun?{" "}
         <Text
           style={ComponentTextStyles.registerHighlight}
-          onPress={() => !loading && router.push("/register")}
-        >
+          onPress={() => !loading && router.push("/register")}        >
           Daftar
         </Text>
         , sekarang juga!

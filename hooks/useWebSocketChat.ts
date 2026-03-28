@@ -1,14 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { LlamaContext } from "llama.rn";
-import { loadLocalModel } from "../utils/modelDownloader";
-import { useNetwork } from "@/context/NetworkContext";
-import { useNetworkStatus } from "./useNetworkStatus";
+import { ChatRepository } from "../data/repositories/ChatRepository";
 
 type Params = {
   model: string;
   getActiveConversationId: () => string;
   onToken: (conversationId: string, token: string) => void;
   onDone: (conversationId: string, fullText: string) => void;
+  vectorStore?: any;
+  llm?: any;
   enabled?: boolean;
 };
 
@@ -25,19 +24,21 @@ export function useWebSocketChat({
   getActiveConversationId,
   onToken,
   onDone,
+  vectorStore,
+  llm,
   enabled = true,
 }: Params) {
   const wsRef = useRef<WebSocket | null>(null);
 
-  const getConversationIdRef = useRef(getActiveConversationId);
+  const getCidRef = useRef(getActiveConversationId);
   const onTokenRef = useRef(onToken);
   const onDoneRef = useRef(onDone);
 
-  getConversationIdRef.current = getActiveConversationId;
+  getCidRef.current = getActiveConversationId;
   onTokenRef.current = onToken;
   onDoneRef.current = onDone;
 
-  const currentConversationIdRef = useRef<string | null>(null);
+  const currentCidRef = useRef<string | null>(null);
 
   const fullRef = useRef("");
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -49,19 +50,13 @@ export function useWebSocketChat({
     timer: null,
     stopped: false,
   });
-  
-  const [llamaContext, setLlamaContext] = useState<LlamaContext | null>(null);
-  const [isOfflineLoading, setIsOfflineLoading] = useState(false);
-
-  const {isInternetReachable, isConnected } = useNetwork();
-  const {isConnected: isNetworkConnected, justDisconnected, justConnected } = useNetworkStatus();
 
   const flushDone = useCallback(() => {
-    const conversationId = currentConversationIdRef.current || getConversationIdRef.current();
+    const cid = currentCidRef.current || getCidRef.current();
     const full = fullRef.current;
     if (full) {
-      console.log("WS Done (flush):", { conversationId, textLen: full.length });
-      onDoneRef.current(conversationId, full);
+      console.log("WS Done (flush):", { cid, textLen: full.length });
+      onDoneRef.current(cid, full);
     }
     fullRef.current = "";
   }, []);
@@ -89,45 +84,17 @@ export function useWebSocketChat({
     const retry = retryRef.current;
     retry.stopped = false;
 
-    if (!enabled) {
+    if (!enabled || model === "tofa-offline") {
       cleanup(retry);
+      if (model === "tofa-offline") setStatus("idle");
       return () => {
         retry.stopped = true;
         cleanup(retry);
       };
     }
 
-    const isOffline = model === "tofa-offline";
-
-    const connect = async () => {
+    const connect = () => {
       if (retry.stopped) return;
-
-      if (isOffline) {
-        if (!llamaContext && !isOfflineLoading) {
-          console.log("Loading local model for:", model);
-          setIsOfflineLoading(true);
-          setStatus("connecting");
-          try {
-            const result = await loadLocalModel();
-            setIsOfflineLoading(false);
-            if (result.success && result.context) {
-              setLlamaContext(result.context);
-              setStatus("open");
-              console.log("Local model loaded successfully");
-            } else {
-              setStatus("error");
-              console.warn("Failed to load local model:", result.error);
-            }
-          } catch (err) {
-            setIsOfflineLoading(false);
-            setStatus("error");
-            console.error("Local model load crash:", err);
-          }
-        } else if (llamaContext) {
-          setStatus("open");
-        }
-        return;
-      }
 
       setStatus("connecting");
       let wsUrl = "";
@@ -141,101 +108,97 @@ export function useWebSocketChat({
       } else if (model === "tofa-ultra") {
         wsUrl = process.env.EXPO_PUBLIC_TOFA_AI_URL + "/ws-rag";
       }
+      const ws = new WebSocket(wsUrl);
+      wsRef.current = ws;
 
-      if (!wsUrl || wsUrl.startsWith("undefined")) {
-        console.warn("No valid WS URL for model:", model);
-        setStatus("idle");
-        return;
-      }
+      ws.onopen = () => {
+        retry.attempt = 0;
+        setStatus("open");
+        console.log("WS connected:", wsUrl);
+      };
 
-      try {
-        const ws = new WebSocket(wsUrl);
-        wsRef.current = ws;
-
-        ws.onopen = () => {
-          retry.attempt = 0;
-          setStatus("open");
-          console.log("WS connected:", wsUrl);
-        };
-
-        ws.onmessage = (event) => {
-          const rawData = event.data;
+      ws.onmessage = (event) => {
+        const rawData = event.data;
         console.log("WS received:", rawData);
-          const conversationId = currentConversationIdRef.current || getConversationIdRef.current();
+        const cid = currentCidRef.current || getCidRef.current();
 
-          if (!currentConversationIdRef.current) {
-            currentConversationIdRef.current = conversationId;
-          }
+        // Lock the CID for this stream
+        if (!currentCidRef.current) {
+          currentCidRef.current = cid;
+        }
 
-          let token = "";
+        let token = "";
 
-          if (typeof rawData === "string") {
-            if (rawData === "[DONE]") {
-              const full = fullRef.current;
-              if (full) onDoneRef.current(conversationId, full);
-              fullRef.current = "";
-              currentConversationIdRef.current = null;
-              if (saveTimeoutRef.current) {
-                clearTimeout(saveTimeoutRef.current);
-                saveTimeoutRef.current = null;
-              }
-              return;
+        if (typeof rawData === "string") {
+          // Handle [DONE] marker
+          if (rawData === "[DONE]") {
+            console.log("[WS DONE] marker received", { cid });
+            const full = fullRef.current;
+            if (full) onDoneRef.current(cid, full);
+            fullRef.current = "";
+            currentCidRef.current = null;
+            if (saveTimeoutRef.current) {
+              clearTimeout(saveTimeoutRef.current);
+              saveTimeoutRef.current = null;
             }
-
-            if (rawData.startsWith("{") && rawData.endsWith("}")) {
-              try {
-                const parsed = JSON.parse(rawData);
-                token = parsed.token || parsed.text || parsed.content || rawData;
-              } catch {
-                token = rawData;
-              }
-            } else {
-              token = rawData;
-            }
-          } else {
-            token = String(rawData ?? "");
-          }
-
-          if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
-
-          fullRef.current += token;
-          onTokenRef.current(conversationId, token);
-
-          saveTimeoutRef.current = setTimeout(() => {
-            flushDone();
-            currentConversationIdRef.current = null;
-          }, 1500);
-        };
-
-        ws.onclose = () => {
-          if (saveTimeoutRef.current) {
-            clearTimeout(saveTimeoutRef.current);
-            saveTimeoutRef.current = null;
-          }
-
-          flushDone();
-          wsRef.current = null;
-
-          if (retry.stopped) {
-            setStatus("closed");
             return;
           }
 
-          retry.attempt += 1;
-          const delay = Math.min(1000 * 2 ** (retry.attempt - 1), 10_000);
+          // Strict JSON check
+          if (rawData.startsWith("{") && rawData.endsWith("}")) {
+            try {
+              const parsed = JSON.parse(rawData);
+              token = parsed.token || parsed.text || parsed.content || rawData;
+            } catch {
+              token = rawData;
+            }
+          } else {
+            token = rawData;
+          }
+        } else {
+          token = String(rawData ?? "");
+        }
 
+        if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+
+        fullRef.current += token;
+        onTokenRef.current(cid, token);
+
+        saveTimeoutRef.current = setTimeout(() => {
+          console.log("[WS TIMEOUT] Saving due to inactivity", {
+            cid,
+            len: fullRef.current.length,
+          });
+          flushDone();
+          currentCidRef.current = null;
+        }, 1500);
+      };
+
+      ws.onclose = () => {
+        if (saveTimeoutRef.current) {
+          clearTimeout(saveTimeoutRef.current);
+          saveTimeoutRef.current = null;
+        }
+
+        flushDone();
+        wsRef.current = null;
+
+        if (retry.stopped) {
           setStatus("closed");
-          retry.timer = setTimeout(connect, delay);
-        };
+          return;
+        }
 
-        ws.onerror = () => {
-          setStatus("error");
-          console.warn("WS error:", wsUrl);
-        };
-      } catch (err) {
-        console.error("WS constructor error:", err);
+        retry.attempt += 1;
+        const delay = Math.min(1000 * 2 ** (retry.attempt - 1), 10_000);
+
+        setStatus("closed");
+        retry.timer = setTimeout(connect, delay);
+      };
+
+      ws.onerror = () => {
         setStatus("error");
-      }
+        console.warn("WS error:", wsUrl);
+      };
     };
 
     connect();
@@ -244,7 +207,7 @@ export function useWebSocketChat({
       retry.stopped = true;
       cleanup(retry);
     };
-  }, [model, enabled, cleanup, flushDone, llamaContext, isOfflineLoading]);
+  }, [model, enabled, cleanup, flushDone]);
 
   useEffect(() => {
     if (!enabled) {
@@ -258,7 +221,7 @@ export function useWebSocketChat({
       saveTimeoutRef.current = null;
     }
     fullRef.current = "";
-    currentConversationIdRef.current = null;
+    currentCidRef.current = null;
 
     if (wsRef.current) {
       wsRef.current.close();
@@ -266,57 +229,127 @@ export function useWebSocketChat({
     }
   }, []);
 
-  const send = useCallback(async (text: string, conversationId?: string) => {
-    const isOffline = model === "tofa-offline";
-    const threadId = conversationId || currentConversationIdRef.current || getConversationIdRef.current();
+  const send = useCallback(async (text: string, cid?: string) => {
+    if (cid) {
+      currentCidRef.current = cid;
+    }
+    const targetCid = cid || getCidRef.current();
 
-    if (isOffline) {
-      if (!llamaContext) {
-        console.warn("Llama context not ready for offline sending");
+    // --- OFFLINE PATH ---
+    if (model === 'tofa-offline') {
+      if (!vectorStore || !llm) {
+        console.warn("Offline components missing");
         return false;
       }
 
-      currentConversationIdRef.current = threadId;
-      fullRef.current = "";
-
       try {
-        console.log("Starting local model completion...");
-        await llamaContext.completion(
-          {
-            messages: [
-              { role: 'user', content: text }
-            ],
-            n_predict: 512,
-            temperature: 0.7,
-            top_k: 40,
-            top_p: 0.9,
-            stop: ["<|im_end|>", "### Instruction:", "### User:", "User:", "\n\n"]
-          },
-          (data) => {
-            const token = data.token;
+        console.log("Starting Offline RAG for:", text);
+        
+        let contextText = "";
+        try {
+          // 1. Fetch Top 5 Text Chunks with 0.4 threshold (matching server)
+          const textResults = await vectorStore.query({ 
+            queryText: text, 
+            nResults: 5,
+            predicate: (r) => (r.similarity || 0) >= 0.4 && r.metadata?.content_type !== 'image'
+          });
+
+          // 2. Fetch Top 2 Image Captions with 0.4 threshold
+          const imageResults = await vectorStore.query({ 
+            queryText: text, 
+            nResults: 2,
+            predicate: (r) => (r.similarity || 0) >= 0.4 && r.metadata?.content_type === 'image'
+          });
+          
+          const combinedResults = [...textResults, ...imageResults];
+
+          if (combinedResults.length > 0) {
+            console.log("--- RAG Retrieval Results (Threshold 0.4) ---");
+            combinedResults.forEach((r: any, i: number) => {
+              const meta = r.metadata || {};
+              const source = meta.source_file || "unknown";
+              const page = meta.page || meta.page_number || "?";
+              const type = meta.content_type === 'image' ? 'IMG' : 'TXT';
+              console.log(`[${type}] ${source} (p.${page}), Score: ${r.similarity?.toFixed(3)}`);
+            });
+            console.log("-----------------------------");
+
+            contextText = combinedResults.map((r: any) => {
+              const meta = r.metadata || {};
+              const source = meta.source_file || "unknown";
+              const page = meta.page || meta.page_number || "?";
+              const type = meta.content_type === 'image' ? 'Visual Content' : 'Text';
+              return `[${type} | ${source} p.${page}]\n${r.document}`;
+            }).join("\n\n---\n\n");
+          } else {
+            console.log("No relevant RAG context found above 0.4 threshold.");
+            contextText = "No relevant information found in the documents.";
+          }
+          
+          console.log("Final context length:", contextText.length);
+        } catch (e) {
+          console.warn("Failed to retrieve context:", e);
+          contextText = "No relevant information found in the documents.";
+        }
+
+        // 3. Fetch Chat History (matching server limit=6)
+        let historyMessages: any[] = [];
+        try {
+          const localHistory = await ChatRepository.getMessagesByConversation(targetCid, 6);
+          historyMessages = localHistory.map(m => ({
+            role: m.role === 'assistant' ? 'assistant' : 'user',
+            content: m.content
+          }));
+          console.log(`Included ${historyMessages.length} messages from history.`);
+        } catch (e) {
+          console.warn("Failed to load chat history for RAG:", e);
+        }
+
+        const systemPrompt = `You are a helpful assistant that specialises in agriculture in the Lake Toba Region in North Sumatra, Indonesia. 
+                              Your name is ToFa (stands for Toba Farm). You answer questions based on your knowledge, with some added knowledge from the context below. 
+
+                              IMPORTANT: The context below may contain descriptions of images from the documents, marked as "[Visual Content | ...]". Use these descriptions to answer questions about figures, photos, or diagrams.
+
+                              You must answer based on the knowledge provided and our previous conversation.
+                              If you don't know the answer, just say: I'm sorry, I cannot answer that.
+                              --------------------
+
+        The context:
+        ${contextText}`;
+
+        onTokenRef.current(targetCid, ""); // Signal start
+        
+        const full = await llm.generate(
+          [
+            { role: 'system', content: systemPrompt },
+            ...historyMessages,
+            { role: 'user', content: text }
+          ],
+          (token: string) => {
             fullRef.current += token;
-            onTokenRef.current(threadId, token);
+            onTokenRef.current(targetCid, token);
           }
         );
 
-        console.log("Local completion done");
-        onDoneRef.current(threadId, fullRef.current);
+        console.log("Offline generation complete");
+        onDoneRef.current(targetCid, full);
         fullRef.current = "";
-        currentConversationIdRef.current = null;
+        currentCidRef.current = null;
         return true;
       } catch (err) {
-        console.error("Local inference error:", err);
+        console.error("Offline generation failed:", err);
         return false;
       }
     }
 
+    // --- ONLINE PATH ---
     const ws = wsRef.current;
     if (!ws || ws.readyState !== WebSocket.OPEN) return false;
 
-    currentConversationIdRef.current = threadId;
     ws.send(text);
     return true;
-  }, [model, llamaContext]);
+  }, [model, vectorStore, llm]);
 
   return { send, status, stop };
 }
+

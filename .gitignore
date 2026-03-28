@@ -44,3 +44,9 @@ app-example
 # generated native folders
 /ios
 /android
+
+# python
+data/chromaDB
+pdf_loader.ipynb
+search.py
+main.py

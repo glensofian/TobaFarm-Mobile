@@ -1,4 +1,4 @@
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import { initLlama, LlamaContext } from 'llama.rn';
 import { MODEL_CONFIG } from '../constants/modelConfig';
 

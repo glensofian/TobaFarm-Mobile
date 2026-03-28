@@ -8,7 +8,6 @@ import {
 } from '../styles';
 import { useNetwork } from '@/context/NetworkContext';
 
-// --- Props ---
 type Props = {
   onSend?: (text: string) => void;
   model?: string;
@@ -19,7 +18,6 @@ export default function ChatInput({ onSend, model, placeholder }: Props) {
   const [value, setValue] = useState('');
   const { isInternetReachable, isConnected } = useNetwork();
 
-  // --- Handlers ---
   const handleSend = () => {
     if (!value.trim()) return;
     if (model !== 'tofa-offline' && (!isInternetReachable || !isConnected)) {

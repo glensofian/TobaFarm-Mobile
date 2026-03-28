@@ -1,4 +1,4 @@
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 
 export const MODEL_CONFIG = {
   HF_REPO: 'ToFaAI/Qwen3-VL-2B-Instruct-Q4_K_M.gguf',
