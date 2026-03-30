@@ -7,10 +7,9 @@ import {
   TextInput,
   TouchableOpacity,
   View,
-  Keyboard,
   ActivityIndicator,
 } from "react-native";
-import { ComponentStyles, ComponentTextStyles, Colors } from "../styles";
+import { ComponentStyles, ComponentTextStyles } from "../styles";
 
 export default function OtpForm() {
   const router = useRouter();
@@ -19,7 +18,11 @@ export default function OtpForm() {
   const user_id = params.user_id || "";
 
   const [otp, setOtp] = useState(["", "", "", "", "", ""]); 
+  
   const [loading, setLoading] = useState(false);
+  
+  const [isInitializing, setIsInitializing] = useState(true); 
+  
   const [resendLoading, setResendLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
@@ -37,6 +40,7 @@ export default function OtpForm() {
   const onLoad = async () => {
     setError(null);
     setInfo(null);
+    setIsInitializing(true);
 
     try {
       const payload: OTPCreate = {
@@ -54,15 +58,13 @@ export default function OtpForm() {
 
       if (response.status === 200) {
         setInfo(`OTP Berhasil Dikirim ke ${email}`);
-      }
-
-      if (response.status !== 200) {
+      } else {
         setError("Gagal mengirim OTP. Silakan coba lagi.");
-        return;
       }
-
     } catch (error) {
       setError("Gagal mengirim OTP. Coba lagi.");
+    } finally {
+      setIsInitializing(false);
     }
   };
 
@@ -106,8 +108,6 @@ export default function OtpForm() {
         return;
       }
 
-      setInfo("Kode OTP berhasil diverifikasi.");
-
       const verifyRegistrationResponse = await axios.post(
         `${process.env.EXPO_PUBLIC_TOFA_API_URL}/auth/verify`,
         payload,
@@ -119,13 +119,10 @@ export default function OtpForm() {
       }
 
       setInfo("Kode OTP berhasil diverifikasi.");
-
-      setLoading(true);
-
+      
       await new Promise((r) => setTimeout(r, 600));
-
-      // Setelah OTP berhasil, arahkan ke login (atau langsung chat jika flow Anda begitu)
       router.replace("/login");
+      
     } catch {
       setError("Kode OTP tidak valid atau sudah kadaluarsa.");
     } finally {
@@ -136,14 +133,17 @@ export default function OtpForm() {
   const onResend = async () => {
     try {
       setResendLoading(true);
+      setOtp(["", "", "", "", "", ""]);
       await onLoad();
     } finally {
       setResendLoading(false);
     }
   };
- return (
+
+  const isFormDisabled = loading || isInitializing || resendLoading;
+
+  return (
     <View style={ComponentStyles.loginCard}>
-      {/* --- Header --- */}
       <Text
         style={[
           ComponentTextStyles.loginLabel,
@@ -164,22 +164,21 @@ export default function OtpForm() {
             style={[
               ComponentStyles.otpInputBox,
               digit ? ComponentStyles.otpInputBoxActive : null,
+              isFormDisabled ? { opacity: 0.5 } : null
             ]}
             keyboardType="number-pad"
             maxLength={1}
             value={digit}
             onChangeText={(text) => handleChange(text, index)}
             onKeyPress={(e) => handleKeyPress(e, index)}
-            editable={!loading}
+            editable={!isFormDisabled}
           />
         ))}
       </View>
 
       {/* --- Status Message --- */}
       {error && (
-        <Text
-          style={[ComponentTextStyles.registerErrorText, { marginBottom: 15 }]}
-        >
+        <Text style={[ComponentTextStyles.registerErrorText, { marginBottom: 15 }]}>
           {error}
         </Text>
       )}
@@ -199,11 +198,11 @@ export default function OtpForm() {
 
       {/* --- Action Button --- */}
       <TouchableOpacity
-        style={[ComponentStyles.loginSubmitButton, loading && { opacity: 0.7 }]}
+        style={[ComponentStyles.loginSubmitButton, isFormDisabled && { opacity: 0.7 }]}
         onPress={onSubmit}
-        disabled={loading}
+        disabled={isFormDisabled}
       >
-        {loading ? (
+        {isFormDisabled ? (
           <ActivityIndicator color="#FFF" />
         ) : (
           <Text style={ComponentTextStyles.loginSubmitText}>
@@ -215,14 +214,12 @@ export default function OtpForm() {
       {/* --- Resend --- */}
       <TouchableOpacity
         onPress={onResend}
-        disabled={loading}
-        style={{ marginTop: 20 }}
-
+        disabled={isFormDisabled}
+        style={{ marginTop: 20, opacity: isFormDisabled ? 0.5 : 1 }}
       >
         <Text style={ComponentTextStyles.registerText}>
           Belum mendapatkan kode?{" "}
           <Text style={ComponentTextStyles.registerHighlight}>Kirim Ulang</Text>
-
         </Text>
       </TouchableOpacity>
     </View>

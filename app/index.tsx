@@ -20,6 +20,7 @@ import {
   ComponentTextStyles,
 } from "../styles";
 import { getValueFor } from "../utils/storage";
+import { createConversationsApi } from "../api/conversationsApi";
 
 export default function Home() {
   const router = useRouter();
@@ -38,6 +39,13 @@ export default function Home() {
         try {
           const userData = JSON.parse(userStr);
           setUsername(userData.username);
+
+          const api = createConversationsApi();
+          const conversations = await api.loadConversations();
+          if (conversations.length > 0) {
+            console.log("Riwayat chat ditemukan, otomatis masuk ke RoomChat...");
+            router.replace("/roomchat");
+          }
         } catch (e) {
           console.error("Gagal parse data user", e);
         }

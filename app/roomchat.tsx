@@ -165,6 +165,7 @@ export default function RoomChat() {
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [isDataLoaded, setIsDataLoaded] = useState(false);
+  const [apiError, setApiError] = useState(false);
   const [messagesByConversation, setMessagesByConversation] = useState<Record<string, Message[]>>({});
   const [activeConversationId, setActiveConversationId] = useState("");
 
@@ -209,8 +210,10 @@ export default function RoomChat() {
     try {
       serverLoaded = await api.loadConversations();
       isApiSuccess = true;
+      setApiError(false);
     } catch (e) {
       console.warn("Could not load server conversations:", e);
+      setApiError(true);
     }
 
     try {
@@ -230,11 +233,22 @@ export default function RoomChat() {
       }
     });
 
-    setConversations(combined);
+    setConversations((prev) => {
+      const tempChats = prev.filter(c => c.id.startsWith("temp-"));
+      
+      const merged = [...tempChats];
+      combined.forEach(c => {
+        if (!merged.find(existing => existing.id === c.id)) {
+          merged.push(c);
+        }
+      });
+      return merged;
+    });
 
     if (combined.length > 0) {
       setActiveConversationId(prev => prev ? prev : combined[0].id);
     }
+
     if (isApiSuccess || isInternetReachable === false) {
       setIsDataLoaded(true);
     } else {
@@ -247,7 +261,6 @@ export default function RoomChat() {
 
     try {
       if (isInternetReachable) {
-        // --- ONLINE: API is the source of truth ---
         const conv = await ChatRepository.getConversation(cid);
         const isLocalUuid = cid.includes('-') && cid.length > 20;
         const targetId = conv?.server_id || (!conv && !isLocalUuid ? cid : null);
@@ -260,10 +273,9 @@ export default function RoomChat() {
                 ...prev,
                 [cid]: serverMsgs,
               }));
-              return; // Done — skip SQLite
+              return;
             }
           } catch (apiErr: any) {
-            // Silence 404 — conversation may not exist on server yet
             if (apiErr?.response?.status !== 404) {
               console.warn("API message fetch error:", apiErr);
             }
@@ -381,7 +393,7 @@ export default function RoomChat() {
 
 // Redirect Home if Conversation = []
   useEffect(() => {
-    if (prompt || !isDataLoaded || isSyncing) return;
+    if (prompt || !isDataLoaded || isSyncing || apiError) return;
 
     const timer = setTimeout(() => {
       if (conversations.length === 0 && activeConversationId === "") {
@@ -391,20 +403,20 @@ export default function RoomChat() {
     }, 200);
 
     return () => clearTimeout(timer);
-  }, [isDataLoaded, isSyncing, conversations.length, activeConversationId, prompt, router]);
+  }, [isDataLoaded, isSyncing, conversations.length, activeConversationId, prompt, apiError,router]);
 
 useEffect(() => {
-  if (prompt && isKnowledgeBaseLoaded) {
+  if (prompt && isKnowledgeBaseLoaded && isDataLoaded) {
     console.log("AI Ready! Processing prompt:", prompt);
 
     const timer = setTimeout(() => {
-      onSend(undefined, prompt);
+      onSend(undefined, prompt, true);
       router.setParams({ prompt: undefined });
     }, 100);
 
     return () => clearTimeout(timer);
   }
-}, [prompt, isKnowledgeBaseLoaded]);
+}, [prompt, isKnowledgeBaseLoaded, isDataLoaded]);
 
   const tempIdMapRef = useRef<Record<string, string>>({});
 
@@ -434,15 +446,23 @@ useEffect(() => {
 
   const t = useMemo(() => translations[lang], [lang]);
 
-  const handleDeleteConversation = (id: string) => {
+  const handleDeleteConversation = async (id: string) => {
     try {
       console.log("Deleting conversation:", id);
-      api.deleteConversation(id);
+
+      await api.deleteConversation(id);
+
       setConversations((prev) => prev.filter((c) => c.id !== id));
-      setActiveConversationId("");
-      setMessagesByConversation({});
-    } catch (e) {
-      console.error("Failed to delete conversation:", e);
+
+      if (activeConversationId === id) {
+        setActiveConversationId("");
+      }
+    } catch (e: any) {
+      if (e.response && e.response.status === 401) {
+        Alert.alert("Sesi Berakhir", "Sesi Anda habis. Silakan login ulang.");
+      } else {
+        Alert.alert("Gagal", "Tidak dapat menghapus percakapan dari server.");
+      }
     }
   };
 
@@ -632,32 +652,32 @@ useEffect(() => {
     setIsSending(false);
   };
 
-  const onSend = async (e?: React.FormEvent, overrideText?: string) => {
+  const onSend = async (e?: React.FormEvent, overrideText?: string, forceNewChat: boolean = false) => {
     if (e) e.preventDefault();
     const text = (overrideText ?? input).trim();
     if (!text || isSending) return;
 
     setIsSending(true);
-    let threadId = activeConversationId;
+    let threadId = forceNewChat ? "" : activeConversationId;
     const isNewChat = !threadId;
+    const generatedTitle = truncateTitle(text, 28);
 
-    // 1. If new chat, prepare immediate UI transition
     if (isNewChat) {
       threadId = "temp-" + uid("t");
-      setActiveConversationId(threadId); // Immediate switch
+      setActiveConversationId(threadId);
+
       setConversations((prev) => [
-        { id: threadId, title: truncateTitle(text, 28), createdAt: nowIso() },
+        { id: threadId, title: generatedTitle, createdAt: nowIso() },
         ...prev,
       ]);
 
-      // 1b. Save the conversation locally if offline so it exists for the message FK
       if (selectedModel === 'tofa-offline') {
         const now = Date.now();
         try {
           console.log("[Offline] Pre-saving conversation to DB:", threadId);
           await ChatRepository.saveConversation({
             id: threadId,
-            title: truncateTitle(text, 28),
+            title: generatedTitle,
             created_at: now,
             is_synced: false
           });
@@ -668,7 +688,6 @@ useEffect(() => {
       }
     }
 
-    // 2. Optimistic UI update
     const userMsg = makeUserMsg(text);
     setMessagesByConversation((prev) => ({
       ...prev,
@@ -676,33 +695,25 @@ useEffect(() => {
     }));
     setInput("");
 
-    // 3. Send via WS (Immediate, so streaming can start)
     const wsText = nickname || ""
       ? `The user has asked you to call him ${nickname}. ${text}`
       : text;
     const isOffline = selectedModel === 'tofa-offline';
 
-    // 4. Save User Message
     if (isOffline) {
       if (isInternetReachable) {
-        // ONLINE with OFFLINE MODEL: Save to API directly (no need for SQLite)
         api.saveMessage(threadId, "user", text).catch(e => console.warn("API save failed:", e));
       } else {
-        // STRICTLY OFFLINE: Save to SQLite
         try {
-          // 4a. Ensure the parent conversation exists in local SQLite 
           const exists = await ChatRepository.getConversation(threadId);
           if (!exists) {
-            console.log("[Offline] Materializing conversation in local DB:", threadId);
-            const currentConv = conversations.find(c => c.id === threadId);
             await ChatRepository.saveConversation({
               id: threadId,
-              title: currentConv?.title || "Percakapan",
+              title: generatedTitle,
               created_at: Date.now(),
               is_synced: false,
             });
           }
-
           await ChatRepository.saveMessage({
             conversation_id: threadId,
             role: 'user',
@@ -722,14 +733,11 @@ useEffect(() => {
       return;
     }
 
-    // 5. If it was a new online chat, get the real ID from backend in background
     if (isNewChat && !isOffline) {
       try {
         const data = await api.createConversation();
         if (data?.id) {
           const realId = data.id;
-
-          // Store mapping for onWsDone
           tempIdMapRef.current[threadId] = realId;
 
           // Swap "temp" state to "real" state
@@ -739,35 +747,38 @@ useEffect(() => {
           });
 
           setConversations((prev) =>
-            prev.map((c) => (c.id === threadId ? { ...c, id: realId } : c))
+            prev.map((c) => (c.id === threadId ? { ...c, id: realId, title: generatedTitle } : c))
           );
 
           setActiveConversationId(realId);
           threadId = realId;
+
+          await api.renameConversation(realId, generatedTitle).catch(e => console.error("Gagal rename di server", e));
         }
       } catch (e) {
         console.error("Failed to create real conversation:", e);
       }
+    } else if (!isNewChat && !isOffline) {
+        const currentConv = conversations.find(c => c.id === threadId);
+        if (currentConv && (currentConv.title === "Percakapan Baru" || currentConv.title === "Untitled")) {
+             // Rename in Backend 
+             api.renameConversation(threadId, generatedTitle).catch(e => console.warn("Failed to rename old chat", e));
+             
+             // Rename in Frontend
+             setConversations((prev) =>
+                prev.map((c) =>
+                c.id === threadId ? { ...c, title: generatedTitle, updatedAt: nowIso() } : c
+                )
+            );
+        }
     }
 
-    // 5. Save user message to backend (async)
     if (!isOffline) {
       try {
         await api.saveMessage(threadId, "user", text);
       } catch (e) {
         console.error("Failed to save user message:", e);
       }
-    }
-
-    // 5. Update title if it was still using default
-    if (!isNewChat) {
-      setConversations((prev) =>
-        prev.map((c) =>
-          c.id === threadId && c.title === "Percakapan Baru"
-            ? { ...c, title: truncateTitle(text, 28), updatedAt: nowIso() }
-            : c,
-        ),
-      );
     }
 
     setIsSending(false);

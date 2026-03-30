@@ -1,21 +1,43 @@
 import axios from "axios";
+import { router } from "expo-router";
 import type {
-    ApiConversation,
-    ApiMessage,
-    Conversation,
-    Message,
+  ApiConversation,
+  ApiMessage,
+  Conversation,
+  Message,
 } from "../types";
-import { getValueFor } from "../utils/storage";
+import { getValueFor, removeValueFor } from "../utils/storage";
 
-type ClearAllresponseponse = { message: string };
+type ClearAllResponse = {
+  message: string;
+};
 
-function isRecord(v: unknown): v is Record<string, unknown> {
-  return typeof v === "object" && v !== null;
+// --- Fungsi Validasi ---
+function assertString(value: unknown, field: string): string {
+  if (typeof value !== "string" || !value.trim()) {
+    throw new Error(`Invalid ${field}`);
+  }
+  return value;
 }
 
-function isString(v: unknown): v is string {
-  return typeof v === "string";
-}
+const apiClient = axios.create();
+
+apiClient.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    if (error.response && error.response.status === 401) {
+      console.warn("Token expired atau tidak valid. Mengarahkan ke Login...");
+      try {
+        await removeValueFor("token");
+        await removeValueFor("user");
+      } catch (e) {
+        console.error("Gagal menghapus sesi lokal:", e);
+      }
+      router.replace("/login");
+    }
+    return Promise.reject(error);
+  }
+);
 
 export function createConversationsApi() {
   const apiBase = process.env.EXPO_PUBLIC_TOFA_API_URL as string;
@@ -27,98 +49,131 @@ export function createConversationsApi() {
     };
   };
 
+  /* =========================
+     LOAD CONVERSATIONS
+  ========================= */
   const loadConversations = async (): Promise<Conversation[]> => {
-    const token = await getValueFor("token");
-    const responseponse = await axios.get(`${apiBase}/conversations/`, {
-      headers: {
-        Authorization: `Bearer ${token ?? ""}`,
-      },
-    });
+    try {
+      const res = await apiClient.get(`${apiBase}/conversations/`, {
+        headers: await authHeaders(),
+      });
 
-    if (responseponse.status !== 200) {
-      console.error("Failed to load conversations");
-      return [];
+      const data = res.data;
+
+      if (!Array.isArray(data)) return [];
+
+      return (data as ApiConversation[]).map((item) => ({
+        id: assertString(item.id, "conversation.id"),
+        title: item.title ?? "Untitled",
+        createdAt: item.created_at || item.createdAt || new Date().toISOString(),
+        updatedAt: item.updated_at || item.updatedAt,
+      }));
+    } catch (error) {
+      console.error("Failed to load conversations", error);
+      throw error;
     }
-
-    console.log("Succesfully Loaded Conversations: ", responseponse.data);
-
-    const data: unknown = responseponse.data;
-    if (!Array.isArray(data)) return [];
-
-    return (data as ApiConversation[]).map((item) => ({
-      id: item.id,
-      title: item.title,
-      createdAt: item.created_at || item.createdAt || new Date().toISOString(),
-      updatedAt: item.updated_at || item.updatedAt,
-    }));
   };
 
+  /* =========================
+     LOAD MESSAGES
+  ========================= */
   const fetchMessages = async (conversationId: string): Promise<Message[]> => {
-    const response = await axios.get(`${apiBase}/messages/${conversationId}`, {
+    const res = await apiClient.get(`${apiBase}/messages/${conversationId}`, {
       headers: await authHeaders(),
     });
 
-    const data: unknown = response.data;
+    const data = res.data;
+
     if (!Array.isArray(data)) return [];
 
     return (data as ApiMessage[]).map((msg) => ({
-      id: msg.id,
-      role: msg.role === "assistant" ? "bot" : "user",
-      text: msg.content,
+      id: assertString(msg.id, "message.id"),
+      role: msg.role === "assistant" ? "bot" : "user", 
+      text: msg.content ?? "",
       createdAt: msg.created_at || msg.createdAt || new Date().toISOString(),
     }));
   };
 
+  /* =========================
+     SAVE MESSAGE
+  ========================= */
   const saveMessage = async (
     conversationId: string,
     role: "user" | "assistant",
     content: string,
-  ) => {
+  ): Promise<void> => {
     if (!content.trim()) return;
 
-    await axios.post(
+    await apiClient.post(
       `${apiBase}/messages/${conversationId}`,
-      { role, content, meta_data: {} },
+      {
+        role,
+        content,
+        meta_data: {},
+      },
       { headers: await authHeaders() },
     );
   };
 
-  const createConversation = async (): Promise<{ id: string } | null> => {
-    const response = await axios.post(
+  /* =========================
+     CREATE CONVERSATION
+  ========================= */
+  const createConversation = async (): Promise<{ id: string }> => {
+    const res = await apiClient.post(
       `${apiBase}/conversations/`,
       {},
       { headers: await authHeaders() },
     );
 
-    const data: unknown = response.data;
-    if (!isRecord(data)) return null;
-    if (!isString(data.id)) return null;
+    console.log("Create Conversation Response:", res);
+    const data = res.data;
 
-    return { id: data.id };
+    if (!data || typeof data !== "object") {
+      throw new Error("Invalid conversation response");
+    }
+
+    const id = assertString((data as { id?: unknown }).id, "conversation.id");
+    return { id };
   };
 
-  const clearAllChats = async (): Promise<ClearAllresponseponse> => {
-    const response = await axios.delete(`${apiBase}/conversations/clear`, {
+  /* =========================
+     CLEAR ALL
+  ========================= */
+  const clearAllChats = async (): Promise<ClearAllResponse> => {
+    const stored = await getValueFor("user");
+    const user_id = stored ? JSON.parse(stored).id : "";
+    const id = user_id as string;
+    
+    console.log("Clearing all chats for user_id:", id, "With type of:", typeof id);
+    
+    const res = await apiClient.delete(`${apiBase}/conversations/clear/${id}`, {
       headers: await authHeaders(),
     });
 
-    const data: unknown = response.data;
-    if (!isRecord(data) || !isString(data.message)) {
-      return { message: "Cleared" };
-    }
-    return { message: data.message };
+    return {
+      message: res.data?.message ?? "All conversations cleared",
+    };
   };
 
-  const renameConversation = async (id: string, title: string) => {
-    await axios.put(
+  /* =========================
+     RENAME
+  ========================= */
+  const renameConversation = async (
+    id: string,
+    title: string,
+  ): Promise<void> => {
+    await apiClient.put(
       `${apiBase}/conversations/${id}`,
       { title },
       { headers: await authHeaders() },
     );
   };
 
-  const deleteConversation = async (id: string) => {
-    await axios.delete(`${apiBase}/conversations/${id}`, {
+  /* =========================
+     DELETE
+  ========================= */
+  const deleteConversation = async (id: string): Promise<void> => {
+    await apiClient.delete(`${apiBase}/conversations/${id}`, {
       headers: await authHeaders(),
     });
   };

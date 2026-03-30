@@ -46,8 +46,8 @@ type Props = {
   onOpenSettings: () => void;
 
   // refs
-  menuRef: React.RefObject<HTMLDivElement | null>;
-  searchInputRef: React.RefObject<HTMLInputElement | null>;
+  menuRef?: React.RefObject<any>;
+  searchInputRef?: React.RefObject<any>;
 };
 
 export default function Sidebar({
@@ -130,7 +130,10 @@ export default function Sidebar({
         <SafeAreaView style={{ flex: 1 }}>
           <Pressable
             style={{ flex: 1 }}
-            onPress={() => setOpenMenuId(null)}
+            onPress={() => {
+              setOpenMenuId(null);
+              showSettingsModal(false);
+            }}
           >
             {/* HEADER */}
             <View style={ComponentStyles.sidebarHeader}>
@@ -165,7 +168,9 @@ export default function Sidebar({
             <TouchableOpacity
               onPress={() => {
                 setOpenMenuId(null);
+                setActiveConversationId("");
                 onNewChat();
+                onClose();
               }}
               style={ComponentStyles.sidebarNewChat}
             >
