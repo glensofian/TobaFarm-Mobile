@@ -446,17 +446,31 @@ useEffect(() => {
 
   const t = useMemo(() => translations[lang], [lang]);
 
-  const handleDeleteConversation = async (id: string) => {
+const handleDeleteConversation = async (id: string) => {
     try {
       console.log("Deleting conversation:", id);
 
-      await api.deleteConversation(id);
+      let targetId = id;
+      if (id.startsWith("temp-")) {
+        targetId = tempIdMapRef.current[id] || id; 
+      }
 
-      setConversations((prev) => prev.filter((c) => c.id !== id));
+      if (!targetId.startsWith("temp-")) {
+        await api.deleteConversation(targetId);
+      } else if (selectedModel === 'tofa-offline') {
+        try {
+          await ChatRepository.deleteConversation(targetId);
+        } catch (localErr) {
+          console.log("Local DB delete notice:", localErr);
+        }
+      }
 
-      if (activeConversationId === id) {
+      setConversations((prev) => prev.filter((c) => c.id !== id && c.id !== targetId));
+
+      if (activeConversationId === id || activeConversationId === targetId) {
         setActiveConversationId("");
       }
+
     } catch (e: any) {
       if (e.response && e.response.status === 401) {
         Alert.alert("Sesi Berakhir", "Sesi Anda habis. Silakan login ulang.");

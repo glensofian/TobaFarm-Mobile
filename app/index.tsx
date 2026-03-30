@@ -80,7 +80,7 @@ export default function Home() {
       >
         <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
           <View style={{ flex: 1 }}>
-            <LoginButton />
+            {!isLoggedIn && <LoginButton />}
 
             {/* LOGO */}
             <View style={ComponentStyles.homeLogoContainer}>

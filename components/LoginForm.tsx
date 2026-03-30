@@ -168,7 +168,6 @@ export default function LoginForm() {
           onPress={() => !loading && router.push("/register")}        >
           Daftar
         </Text>
-        , sekarang juga!
       </Text>
 
       {/* --- Action Button --- */}
