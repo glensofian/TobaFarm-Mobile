@@ -70,6 +70,7 @@ export const ComponentStyles = StyleSheet.create({
   },
 
   passwordInput: {
+    color: Colors.black,
     flex: 1,
   },
 
