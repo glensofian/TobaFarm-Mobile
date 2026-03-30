@@ -135,16 +135,22 @@ export default function RoomChat() {
   useEffect(() => {
     if (vectorStore && llm && !isKnowledgeBaseLoaded) {
       const init = async () => {
-        // Load the Vector Store (initializes dimension)
-        await loadKnowledgeBase(vectorStore);
-        // Load the LLM into memory
-        await llm.load();
-        setIsKnowledgeBaseLoaded(true);
+        try {
+          // Load the Vector Store (initializes dimension)
+          await loadKnowledgeBase(vectorStore);
+          // Load the LLM into memory
+          try {
+            await llm.load();
+          } catch (llmErr) {
+            console.warn("LM Offline belum siap/belum didownload, tapi sistem tetap jalan untuk mode Online.");
+          }
+          setIsKnowledgeBaseLoaded(true);
+        } catch (err) {
+          setIsKnowledgeBaseLoaded(true);
+        }
       };
       
-      init().catch(err => {
-        console.error("Failed to seed knowledge base or load model:", err);
-      });
+      init();
     }
   }, [vectorStore, llm, isKnowledgeBaseLoaded]);
 
@@ -152,7 +158,7 @@ export default function RoomChat() {
 
   const [input, setInput] = useState("");
   const [isSending, setIsSending] = useState(false);
-  const [nickname, setNickname] = useState<string>("William");
+  const [nickname, setNickname] = useState<string>("");
   const router = useRouter();
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -365,6 +371,29 @@ export default function RoomChat() {
   useEffect(() => {
     handleLoadMessages(activeConversationId);
   }, [activeConversationId, handleLoadMessages]);
+
+  // Redirect Home if Conversation = []
+  useEffect(() => {
+    if (prompt) return;
+
+    if (!isSyncing && conversations.length === 0 && activeConversationId === "") {
+      console.log("Percakapan kosong, mengalihkan ke Home...");
+      router.replace("/");
+    }
+  }, [isSyncing, conversations.length, activeConversationId, router]);
+
+useEffect(() => {
+  if (prompt && isKnowledgeBaseLoaded) {
+    console.log("AI Ready! Processing prompt:", prompt);
+
+    const timer = setTimeout(() => {
+      onSend(undefined, prompt);
+      router.setParams({ prompt: undefined });
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }
+}, [prompt, isKnowledgeBaseLoaded]);
 
   const tempIdMapRef = useRef<Record<string, string>>({});
 
