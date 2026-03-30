@@ -164,6 +164,7 @@ export default function RoomChat() {
   const [searchQuery, setSearchQuery] = useState('');
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [isDataLoaded, setIsDataLoaded] = useState(false);
   const [messagesByConversation, setMessagesByConversation] = useState<Record<string, Message[]>>({});
   const [activeConversationId, setActiveConversationId] = useState("");
 
@@ -203,26 +204,23 @@ export default function RoomChat() {
   const handleLoadConversations = useCallback(async () => {
     let serverLoaded: Conversation[] = [];
     let localLoaded: any[] = [];
+    let isApiSuccess = false;
 
-    // 1. Load Server (Try but don't crash)
     try {
       serverLoaded = await api.loadConversations();
+      isApiSuccess = true;
     } catch (e) {
       console.warn("Could not load server conversations:", e);
     }
 
-    // 2. Load local-only (unsynced) conversations.
-    // Synced ones were deleted from SQLite after sync, so this only shows offline-created ones.
     try {
       localLoaded = await ChatRepository.getAllConversations();
     } catch (e) {
       console.error("Could not load local conversations:", e);
     }
 
-    // 3. Merge: server list first, then local-only (offline-created)
     const combined = [...serverLoaded];
     localLoaded.forEach(lc => {
-      // Only add if not already represented by server_id
       if (!combined.find(s => s.id === lc.id || s.id === lc.server_id)) {
         combined.push({
           id: lc.id,
@@ -233,7 +231,16 @@ export default function RoomChat() {
     });
 
     setConversations(combined);
-  }, [api]);
+
+    if (combined.length > 0) {
+      setActiveConversationId(prev => prev ? prev : combined[0].id);
+    }
+    if (isApiSuccess || isInternetReachable === false) {
+      setIsDataLoaded(true);
+    } else {
+      setTimeout(() => setIsDataLoaded(true), 2000);
+    }
+  }, [api, isInternetReachable]);
 
   const handleLoadMessages = useCallback(async (cid: string) => {
     if (!cid || cid.startsWith("temp-")) return;
@@ -372,15 +379,19 @@ export default function RoomChat() {
     handleLoadMessages(activeConversationId);
   }, [activeConversationId, handleLoadMessages]);
 
-  // Redirect Home if Conversation = []
+// Redirect Home if Conversation = []
   useEffect(() => {
-    if (prompt) return;
+    if (prompt || !isDataLoaded || isSyncing) return;
 
-    if (!isSyncing && conversations.length === 0 && activeConversationId === "") {
-      console.log("Percakapan kosong, mengalihkan ke Home...");
-      router.replace("/");
-    }
-  }, [isSyncing, conversations.length, activeConversationId, router]);
+    const timer = setTimeout(() => {
+      if (conversations.length === 0 && activeConversationId === "") {
+        console.log("Percakapan benar-benar kosong, mengalihkan ke Home...");
+        router.replace("/");
+      }
+    }, 200);
+
+    return () => clearTimeout(timer);
+  }, [isDataLoaded, isSyncing, conversations.length, activeConversationId, prompt, router]);
 
 useEffect(() => {
   if (prompt && isKnowledgeBaseLoaded) {
@@ -389,7 +400,7 @@ useEffect(() => {
     const timer = setTimeout(() => {
       onSend(undefined, prompt);
       router.setParams({ prompt: undefined });
-    }, 500);
+    }, 100);
 
     return () => clearTimeout(timer);
   }

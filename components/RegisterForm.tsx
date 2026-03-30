@@ -99,7 +99,7 @@ export default function RegisterForm() {
 
         await new Promise((r) => setTimeout(r, 600));
 
-        router.push({
+        router.replace({
           pathname: "/otp",
           params: otpParams as any,
         });

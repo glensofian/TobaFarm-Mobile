@@ -125,7 +125,7 @@ export default function OtpForm() {
       await new Promise((r) => setTimeout(r, 600));
 
       // Setelah OTP berhasil, arahkan ke login (atau langsung chat jika flow Anda begitu)
-      router.push("/login");
+      router.replace("/login");
     } catch {
       setError("Kode OTP tidak valid atau sudah kadaluarsa.");
     } finally {
