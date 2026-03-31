@@ -1,8 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Text, TouchableOpacity, View, BackHandler } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { Alert, Text, TouchableOpacity, View, BackHandler, KeyboardAvoidingView, Platform, Keyboard } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import ChatInput from '../components/ChatInput';
 import ChatList from '../components/ChatList';
 import Sidebar from '../components/Sidebar';
@@ -72,6 +72,22 @@ export default function RoomChat() {
   const { isConnected: isNetworkConnected, justDisconnected, justConnected } = useNetworkStatus();
   const [mode, setMode] = useState<"online" | "offline">("online");
   const [initializationError, setInitializationError] = useState<string | null>(null);
+
+  const insets = useSafeAreaInsets();
+  const [isKeyboardVisible, setKeyboardVisible] = useState(false);
+
+  useEffect(() => {
+    const showEvent = Platform.OS === 'android' ? 'keyboardDidShow' : 'keyboardWillShow';
+    const hideEvent = Platform.OS === 'android' ? 'keyboardDidHide' : 'keyboardWillHide';
+
+    const showListener = Keyboard.addListener(showEvent, () => setKeyboardVisible(true));
+    const hideListener = Keyboard.addListener(hideEvent, () => setKeyboardVisible(false));
+
+    return () => {
+      showListener.remove();
+      hideListener.remove();
+    };
+  }, []);
 
   // Debugging logs for URL constants
   useEffect(() => {
@@ -262,8 +278,10 @@ export default function RoomChat() {
     try {
       if (isInternetReachable) {
         const conv = await ChatRepository.getConversation(cid);
-        const isLocalUuid = cid.includes('-') && cid.length > 20;
-        const targetId = conv?.server_id || (!conv && !isLocalUuid ? cid : null);
+        // If there's a stored conversation, use its server_id (if synced)
+        // If it's not in the local DB at all (!conv), it MUST be a server conversation, so use cid directly.
+        // If it's in the DB but server_id is null, it's unsynced local, so targetId becomes null (correctly skipping fetch).
+        const targetId = conv?.server_id || (!conv ? cid : null);
 
         if (targetId) {
           try {
@@ -810,6 +828,7 @@ const handleDeleteConversation = async (id: string) => {
 
   return (
     <SafeAreaView
+      edges={["top"]}
       style={[
         Layout.chatScreen,
         { backgroundColor: Colors.backgroundPrimary },
@@ -994,26 +1013,32 @@ const handleDeleteConversation = async (id: string) => {
           onPress={() => setModelsModalVisible(false)}
         />
       )}
-      {/* ===== CHAT LIST ===== */}
-      <View style={ComponentStyles.chatListContainer}>
-        {isSyncing && (
-          <View style={ComponentStyles.syncBanner}>
-            <Text style={ComponentTextStyles.syncBannerText}>
-              Menyinkronkan percakapan...
-            </Text>
-          </View>
-        )}
-        <ChatList data={activeMessages} />
-      </View>
+      {/* ===== AREA CHAT & INPUT ===== */}
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === "ios" ? "padding" : "padding"}
+        enabled={Platform.OS === "ios" || isKeyboardVisible}
+      >
+        {/* ===== CHAT LIST ===== */}
+        <View style={ComponentStyles.chatListContainer}>
+          {isSyncing && (
+            <View style={ComponentStyles.syncBanner}>
+              <Text style={ComponentTextStyles.syncBannerText}>
+                Menyinkronkan percakapan...
+              </Text>
+            </View>
+          )}
+          <ChatList data={activeMessages} />
+        </View>
 
-      {/* ===== INPUT ===== */}
-      <View style={Layout.chatInputContainer}>
-        <ChatInput
-          model={selectedModel}
-          onSend={(text) => onSend(undefined, text)}
-        />
-      </View>
-
+        {/* ===== INPUT ===== */}
+        <View style={[Layout.chatInputContainer, { paddingBottom: isKeyboardVisible ? 10 : insets.bottom + 10 }]}>
+          <ChatInput
+            model={selectedModel}
+            onSend={(text) => onSend(undefined, text)}
+          />
+        </View>
+      </KeyboardAvoidingView>
 
       <NoInternetModal
         visible={!isNetworkConnected && !isModalDismissed}

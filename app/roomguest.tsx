@@ -1,15 +1,7 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import {
-  Alert,
-  KeyboardAvoidingView,
-  Platform,
-  Text,
-  TouchableOpacity,
-  View,
-  Keyboard,
-} from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { Alert, KeyboardAvoidingView, Platform, Text, TouchableOpacity, View, Keyboard } from "react-native";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import ChatInput from "../components/ChatInput";
 import ChatList from "../components/ChatList";
@@ -55,6 +47,22 @@ export default function RoomGuest() {
 
   // --- State Dropdown ---
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+
+  // --- Keyboard State ---
+  const [isKeyboardVisible, setKeyboardVisible] = useState(false);
+
+  useEffect(() => {
+    const showEvent = Platform.OS === 'android' ? 'keyboardDidShow' : 'keyboardWillShow';
+    const hideEvent = Platform.OS === 'android' ? 'keyboardDidHide' : 'keyboardWillHide';
+
+    const showListener = Keyboard.addListener(showEvent, () => setKeyboardVisible(true));
+    const hideListener = Keyboard.addListener(hideEvent, () => setKeyboardVisible(false));
+
+    return () => {
+      showListener.remove();
+      hideListener.remove();
+    };
+  }, []);
 
   // --- State Network ---
   const { isInternetReachable } = useNetwork();
@@ -210,6 +218,7 @@ export default function RoomGuest() {
   };
 
   // --- Mapper UI List Chat ---
+  const insets = useSafeAreaInsets();
   const activeMessagesUI = guestMessages.map((m) => ({
     id: m.id,
     type: m.role === "bot" || (m as any).role === "assistant" ? "ai" : "user",
@@ -217,23 +226,26 @@ export default function RoomGuest() {
   }));
 
   return (
-    <View style={{ flex: 1, backgroundColor: Colors.backgroundPrimary }}>
+    <SafeAreaView
+      edges={["top"]}
+      style={[
+        { flex: 1, backgroundColor: Colors.backgroundPrimary },
+      ]}
+    >
       {/* ===== HEADER GUEST ===== */}
-      <SafeAreaView
-        edges={["top"]}
-        style={{ backgroundColor: Colors.backgroundPrimary, zIndex: 20 }}
+      <View
+        style={[ComponentStyles.roomChatHeader, { height: 60, zIndex: 20 }]}
       >
-        <View style={[ComponentStyles.roomChatHeader, { height: 60 }]}>
-          <View style={{ flex: 1, justifyContent: "center" }}>
-            <Text
-              style={[
-                ComponentTextStyles.roomChatHeaderTitle,
-                { fontSize: 20, fontFamily: "Montserrat-Bold" },
-              ]}
-            >
-              TobaFarm
-            </Text>
-          </View>
+        <View style={{ flex: 1, justifyContent: "center" }}>
+          <Text
+            style={[
+              ComponentTextStyles.roomChatHeaderTitle,
+              { fontSize: 20, fontFamily: "Montserrat-Bold" },
+            ]}
+          >
+            TobaFarm
+          </Text>
+        </View>
 
           {/* CUSTOM DROPDOWN SELECTOR */}
           <View
@@ -393,7 +405,6 @@ export default function RoomGuest() {
             </TouchableOpacity>
           </View>
         </View>
-      </SafeAreaView>
 
       {/* Backdrop Dropdown */}
       {isDropdownOpen && (
@@ -407,45 +418,42 @@ export default function RoomGuest() {
       {/* ===== AREA CHAT & INPUT ===== */}
       <KeyboardAvoidingView
         style={{ flex: 1 }}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        behavior={Platform.OS === "ios" ? "padding" : "padding"}
+        enabled={Platform.OS === "ios" || isKeyboardVisible}
       >
-        <View style={{ flex: 1 }}>
-          <View
-            style={[
-              ComponentStyles.syncBanner,
-              { backgroundColor: "rgba(255,255,255,0.1)" },
-            ]}
-          >
-            <Text
-              style={[ComponentTextStyles.syncBannerText, { color: "#ccc" }]}
-            >
-              Mode Tamu: Percakapan ini tidak tersimpan
-            </Text>
-          </View>
-
-          <View style={{ flex: 1 }}>
-            <ChatList data={activeMessagesUI} />
-          </View>
-        </View>
-
-        {/* Input Container */}
+        {/* ===== CHAT LIST ===== */}
+      <View style={ComponentStyles.chatListContainer}>
         <View
-          pointerEvents={isSending ? "none" : "auto"}
           style={[
-            Layout.chatInputContainer,
-            { paddingBottom: Platform.OS === "android" ? 12 : 0 },
+            ComponentStyles.syncBanner,
+            { backgroundColor: "rgba(255,255,255,0.1)" },
           ]}
         >
-          <ChatInput
-            model={selectedModel}
-            onSend={(text) => onSend(undefined, text)}
-            placeholder={
-              isSending
-                ? `ToFa Sedang Menjawab${typingDots}`
-                : "Tanyakan sesuatu..."
-            }
-          />
+          <Text
+            style={[ComponentTextStyles.syncBannerText, { color: "#ccc" }]}
+          >
+            Mode Tamu: Percakapan ini tidak tersimpan
+          </Text>
         </View>
+
+        <ChatList data={activeMessagesUI} />
+      </View>
+
+      {/* ===== INPUT ===== */}
+      <View
+        pointerEvents={isSending ? "none" : "auto"}
+        style={[Layout.chatInputContainer, { paddingBottom: isKeyboardVisible ? 10 : insets.bottom + 10 }]}
+      >
+        <ChatInput
+          model={selectedModel}
+          onSend={(text) => onSend(undefined, text)}
+          placeholder={
+            isSending
+              ? `ToFa Sedang Menjawab${typingDots}`
+              : "Tanyakan sesuatu..."
+          }
+        />
+      </View>
       </KeyboardAvoidingView>
 
       {/* ===== MODALS & OVERLAYS ===== */}
@@ -463,6 +471,6 @@ export default function RoomGuest() {
           setDownloadModelVisible(false);
         }}
       />
-    </View>
+    </SafeAreaView>
   );
 }

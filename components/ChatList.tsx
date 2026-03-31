@@ -4,13 +4,27 @@ import ChatBubble from "./ChatBubble";
 
 export default function ChatList({ data }: any) {
   const flatListRef = useRef<FlatList>(null);
+  const isAtBottomRef = useRef(true);
 
   const scrollToBottom = () => {
     flatListRef.current?.scrollToEnd({ animated: true });
   };
 
+  const handleScroll = (event: any) => {
+    const { layoutMeasurement, contentOffset, contentSize } = event.nativeEvent;
+    // Check if the user is within 100 pixels of the bottom
+    const isAtBottom = layoutMeasurement.height + contentOffset.y >= contentSize.height - 100;
+    isAtBottomRef.current = isAtBottom;
+  };
+
+  const handleContentSizeChange = () => {
+    if (isAtBottomRef.current) {
+      scrollToBottom();
+    }
+  };
+
   useEffect(() => {
-    if (data.length > 0) {
+    if (data.length > 0 && isAtBottomRef.current) {
       scrollToBottom();
     }
   }, [data]);
@@ -24,13 +38,17 @@ export default function ChatList({ data }: any) {
         <ChatBubble type={item.type} text={item.text} />
       )}
       showsVerticalScrollIndicator={false}
+      onScroll={handleScroll}
+      scrollEventThrottle={16}
       contentContainerStyle={{
         paddingHorizontal: 16,
         paddingVertical: 12,
         paddingBottom: 20,
       }}
-      onContentSizeChange={scrollToBottom}
-      onLayout={scrollToBottom}
+      onContentSizeChange={handleContentSizeChange}
+      onLayout={() => {
+        if (isAtBottomRef.current) scrollToBottom();
+      }}
     />
   );
 }
