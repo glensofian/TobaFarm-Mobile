@@ -79,23 +79,51 @@ export default function Sidebar({
   const [settingsModal, showSettingsModal] = useState(false);
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renamingValue, setRenamingValue] = useState("");
-  const slideAnim = useRef(new Animated.Value(-300)).current;
+  const [isVisible, setIsVisible] = useState(showSidebar);
+  const slideAnim = useRef(new Animated.Value(showSidebar ? 0 : -300)).current;
+  const fadeAnim = useRef(new Animated.Value(showSidebar ? 1 : 0)).current;
 
   useEffect(() => {
-    Animated.timing(slideAnim, {
-      toValue: showSidebar ? 0 : -300,
-      duration: 300,
-      useNativeDriver: true,
-    }).start();
+    if (showSidebar) {
+      setIsVisible(true);
+      Animated.parallel([
+        Animated.timing(slideAnim, {
+          toValue: 0,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    } else {
+      Animated.parallel([
+        Animated.timing(slideAnim, {
+          toValue: -350,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+        Animated.timing(fadeAnim, {
+          toValue: 0,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+      ]).start(() => {
+        setIsVisible(false);
+      });
+    }
   }, [showSidebar]);
 
-  if (!showSidebar) return null;
+  if (!isVisible) return null;
 
   const onClose = () => setShowSidebar(false);
 
   const handleLogout = async () => {
     await removeValueFor("token");
     await removeValueFor("user");
+    await removeValueFor("lastConversationId");
     showSettingsModal(false);
     router.replace("/");
   };
@@ -114,14 +142,16 @@ export default function Sidebar({
   return (
     <View style={ComponentStyles.sidebarOverlay}>
       {/* ===== BACKDROP ===== */}
-      <TouchableOpacity
-        style={[ComponentStyles.sidebarBackdrop, { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }]}
-        activeOpacity={1}
-        onPress={() => {
-          setOpenMenuId(null);
-          onClose();
-        }}
-      />
+      <Animated.View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, opacity: fadeAnim }}>
+        <TouchableOpacity
+          style={[ComponentStyles.sidebarBackdrop, { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }]}
+          activeOpacity={1}
+          onPress={() => {
+            setOpenMenuId(null);
+            onClose();
+          }}
+        />
+      </Animated.View>
 
       {/* ===== SIDEBAR CONTENT ===== */}
       <Animated.View 
@@ -138,16 +168,32 @@ export default function Sidebar({
             {/* HEADER */}
             <View style={ComponentStyles.sidebarHeader}>
               {searchOpen ? (
-                <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', backgroundColor: '#F5F5F5', borderRadius: 8, paddingHorizontal: 8, height: 40 }}>
-                  <Ionicons name="search" size={18} color={Colors.black} style={{ marginRight: 8 }} />
+                <View style={{ 
+                  flex: 1, 
+                  flexDirection: 'row', 
+                  alignItems: 'center', 
+                  backgroundColor: '#FFFFFF', 
+                  borderWidth: 1,
+                  borderColor: '#CCCCCC',
+                  borderRadius: 10, 
+                  paddingHorizontal: 12, 
+                  height: 42 
+                }}>
+                  <Ionicons name="search" size={18} color={'#888'} style={{ marginRight: 8 }} />
                   <TextInput
-                    style={{ flex: 1, fontFamily: 'Montserrat-Regular', fontSize: 14, color: Colors.black, padding: 0 }}
+                    style={{ flex: 1, fontFamily: 'Montserrat-Regular', fontSize: 14, color: Colors.black, paddingVertical: 0 }}
                     value={searchQuery}
                     onChangeText={setSearchQuery}
                     placeholder={t?.searchPlaceholder || "Cari percakapan..."}
+                    placeholderTextColor="#999"
                     autoFocus
                   />
-                  <TouchableOpacity onPress={() => { setSearchOpen(() => false); setSearchQuery(''); }}>
+                  {searchQuery.length > 0 ? (
+                    <TouchableOpacity onPress={() => setSearchQuery('')} style={{ padding: 4 }}>
+                      <Ionicons name="close-circle" size={18} color={'#999'} />
+                    </TouchableOpacity>
+                  ) : null}
+                  <TouchableOpacity onPress={() => { setSearchOpen(() => false); setSearchQuery(''); }} style={{ padding: 4, marginLeft: 4 }}>
                     <Ionicons name="close" size={20} color={Colors.black} />
                   </TouchableOpacity>
                 </View>

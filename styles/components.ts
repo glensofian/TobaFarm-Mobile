@@ -154,8 +154,8 @@ export const ComponentStyles = StyleSheet.create({
     right: 0,
     bottom: 0,
     flexDirection: 'row',
-    zIndex: 999,
-    elevation: 30,
+    zIndex: 2000,
+    elevation: 40,
   },
 
   sidebarBackdrop: {

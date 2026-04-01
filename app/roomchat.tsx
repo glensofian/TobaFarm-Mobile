@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Text, TouchableOpacity, View, BackHandler, KeyboardAvoidingView, Platform, Keyboard } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import ChatInput from '../components/ChatInput';
+import FirstCanvas from '../components/FirstCanvas';
 import ChatList from '../components/ChatList';
 import Sidebar from '../components/Sidebar';
 import { useSyncChat } from '../hooks/useSyncChat';
@@ -262,10 +263,6 @@ export default function RoomChat() {
       return merged;
     });
 
-    if (combined.length > 0) {
-      setActiveConversationId(prev => prev ? prev : combined[0].id);
-    }
-
     if (isApiSuccess || isInternetReachable === false) {
       setIsDataLoaded(true);
     } else {
@@ -372,9 +369,20 @@ export default function RoomChat() {
       if (savedLang) {
         setLang(savedLang === "en" ? "en" : "id");
       }
+
+      const lastChat = await getValueFor("lastConversationId");
+      if (lastChat) {
+        setActiveConversationId(String(lastChat));
+      }
     };
     init();
   }, []);
+
+  useEffect(() => {
+    if (activeConversationId && !activeConversationId.startsWith("temp-")) {
+      save("lastConversationId", activeConversationId);
+    }
+  }, [activeConversationId]);
 
   /* =======================
      RAG SEEDING (AUTO-INITIALIZE)
@@ -512,31 +520,7 @@ const handleDeleteConversation = async (id: string) => {
   );
 
   const onNewChat = async () => {
-    const isOffline = selectedModel === 'tofa-offline';
-    try {
-      let newId = "";
-      let newTitle = "Percakapan Baru";
-
-      if (isOffline) {
-        const localConv = await ChatRepository.createConversation(newTitle);
-        newId = localConv.id;
-      } else {
-        const data = await api.createConversation();
-        if (!data?.id) return;
-        newId = data.id;
-      }
-
-      const newConv: Conversation = {
-        id: newId,
-        title: newTitle,
-        createdAt: nowIso(),
-      };
-      setConversations((prev) => [newConv, ...prev]);
-      setMessagesByConversation((prev) => ({ ...prev, [newId]: [] }));
-      setActiveConversationId(newId);
-    } catch (e) {
-      console.error("Failed to create new chat:", e);
-    }
+    setActiveConversationId("");
   };
 
   const handleDeleteOfflineModel = () => {
@@ -840,43 +824,12 @@ const handleDeleteConversation = async (id: string) => {
         </View>
       )}
 
-      {/* ===== SIDEBAR ===== */}
-      <Sidebar
-        user={user}
-        t={t}
-        showSidebar={sidebarOpen}
-        setShowSidebar={setSidebarOpen}
-        onOpenRename={handleRenameConversation}
-        onNewChat={onNewChat}
-        conversations={conversations}
-        activeConversationId={activeConversationId}
-        setActiveConversationId={setActiveConversationId}
-        onDeleteConversation={handleDeleteConversation}
-        onClearAll={handleClearAllChats}
-        searchOpen={searchOpen}
-        setSearchOpen={setSearchOpen}
-        searchQuery={searchQuery}
-        sidebarCollapsed={sidebarOpen}
-        setSidebarCollapsed={setSidebarOpen}
-        setSearchQuery={setSearchQuery}
-        filteredConversations={filteredConversations}
-        openMenuId={openMenuId}
-        setOpenMenuId={setOpenMenuId}
-        menuRef={menuRef}
-        searchInputRef={searchInputRef}
-        onOpenSettings={handleOpenSettings}
-      />
-
       {/* ===== HEADER ===== */}
       <View
         style={ComponentStyles.roomChatHeader}
       >
         <TouchableOpacity onPress={() => setSidebarOpen(!sidebarOpen)}>
-          {sidebarOpen ? (
-            <Ionicons name="menu" size={22} color={Colors.black} />
-          ) : (
-            <Ionicons name="menu" size={22} color={Colors.white} />
-          )}
+          <Ionicons name="menu" size={22} color={Colors.white} />
         </TouchableOpacity>
 
         <View style={ComponentStyles.roomChatHeaderCenter}>
@@ -1004,28 +957,65 @@ const handleDeleteConversation = async (id: string) => {
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === "ios" ? "padding" : "padding"}
-        enabled={Platform.OS === "ios" || isKeyboardVisible}
+        enabled={Platform.OS === "ios" || (isKeyboardVisible && !sidebarOpen)}
       >
-        {/* ===== CHAT LIST ===== */}
-        <View style={ComponentStyles.chatListContainer}>
-          {isSyncing && (
-            <View style={ComponentStyles.syncBanner}>
-              <Text style={ComponentTextStyles.syncBannerText}>
-                Menyinkronkan percakapan...
-              </Text>
+        {activeConversationId ? (
+          <>
+            {/* ===== CHAT LIST ===== */}
+            <View style={ComponentStyles.chatListContainer}>
+              {isSyncing && (
+                <View style={ComponentStyles.syncBanner}>
+                  <Text style={ComponentTextStyles.syncBannerText}>
+                    Menyinkronkan percakapan...
+                  </Text>
+                </View>
+              )}
+              <ChatList data={activeMessages} />
             </View>
-          )}
-          <ChatList data={activeMessages} />
-        </View>
 
-        {/* ===== INPUT ===== */}
-        <View style={[Layout.chatInputContainer, { paddingBottom: isKeyboardVisible ? 10 : insets.bottom + 10 }]}>
-          <ChatInput
-            model={selectedModel}
-            onSend={(text) => onSend(undefined, text)}
+            {/* ===== INPUT ===== */}
+            <View style={[Layout.chatInputContainer, { paddingBottom: (isKeyboardVisible && !sidebarOpen) ? 10 : insets.bottom + 10 }]}>
+              <ChatInput
+                model={selectedModel}
+                onSend={(text) => onSend(undefined, text)}
+              />
+            </View>
+          </>
+        ) : (
+          <FirstCanvas
+            username={user?.username}
+            selectedModel={selectedModel}
+            onSend={(text) => onSend(undefined, text, true)}
           />
-        </View>
+        )}
       </KeyboardAvoidingView>
+
+      {/* ===== SIDEBAR ===== */}
+      <Sidebar
+        user={user}
+        t={t}
+        showSidebar={sidebarOpen}
+        setShowSidebar={setSidebarOpen}
+        onOpenRename={handleRenameConversation}
+        onNewChat={onNewChat}
+        conversations={conversations}
+        activeConversationId={activeConversationId}
+        setActiveConversationId={setActiveConversationId}
+        onDeleteConversation={handleDeleteConversation}
+        onClearAll={handleClearAllChats}
+        searchOpen={searchOpen}
+        setSearchOpen={setSearchOpen}
+        searchQuery={searchQuery}
+        sidebarCollapsed={sidebarOpen}
+        setSidebarCollapsed={setSidebarOpen}
+        setSearchQuery={setSearchQuery}
+        filteredConversations={filteredConversations}
+        openMenuId={openMenuId}
+        setOpenMenuId={setOpenMenuId}
+        menuRef={menuRef}
+        searchInputRef={searchInputRef}
+        onOpenSettings={handleOpenSettings}
+      />
 
       {/* ===== MODALS & OVERLAYS ===== */}
       <NotificationModal
