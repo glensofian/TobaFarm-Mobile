@@ -6,11 +6,11 @@ import { Ionicons } from "@expo/vector-icons";
 import ChatInput from "../components/ChatInput";
 import ChatList from "../components/ChatList";
 import DownloadModel from "@/components/DownloadModel";
-import NoInternetModal from "../components/NoInternetModal";
+import NotificationModal from "../components/NotificationModal";
 import { useWebSocketChat } from "../hooks/useWebSocketChat";
 import { useNetwork } from "@/context/NetworkContext";
 import { useNetworkStatus } from "@/hooks/useNetworkStatus";
-import * as FileSystem from "expo-file-system";
+import * as FileSystem from "expo-file-system/legacy";
 import { Message } from "../types";
 import { nowIso } from "@/utils/date";
 import { uid } from "@/utils/uid";
@@ -112,38 +112,32 @@ export default function RoomGuest() {
   }, [checkOfflineModel]);
 
   // --- Handle Initial Prompt ---
-  useEffect(() => {
-    if (prompt && guestMessages.length === 0) {
-      setTimeout(() => {
-        onSend(undefined, prompt as string);
-      }, 500);
-    }
-  }, [prompt]);
+  const [notification, setNotification] = useState<{title: string, message: string} | null>(null);
 
   // --- Automatic Model Change ---
   useEffect(() => {
     if (isInternetReachable === false && selectedModel !== "tofa-offline") {
       if (isOfflineModelDownloaded) {
         setSelectedModel("tofa-offline");
-        Alert.alert(
-          "Offline Mode",
-          "Koneksi terputus. Beralih ke mode offline otomatis.",
-        );
+        setNotification({
+          title: "Offline Mode",
+          message: "Koneksi terputus. Beralih ke mode offline otomatis."
+        });
       } else {
-        Alert.alert(
-          "Mode Offline Tidak Tersedia",
-          "Koneksi terputus. Silakan hubungkan internet untuk mengunduh model terlebih dahulu.",
-        );
+        setNotification({
+          title: "Mode Offline Tidak Tersedia",
+          message: "Koneksi terputus. Silakan hubungkan internet untuk mengunduh model terlebih dahulu."
+        });
       }
     } else if (
       isInternetReachable === true &&
       selectedModel === "tofa-offline"
     ) {
       setSelectedModel(defaultOnlineModel);
-      Alert.alert(
-        "Online Mode",
-        "Koneksi pulih. AI kembali menggunakan cloud.",
-      );
+      setNotification({
+        title: "Online Mode",
+        message: "Koneksi pulih. AI kembali menggunakan cloud."
+      });
     }
   }, [
     isInternetReachable,
@@ -153,8 +147,11 @@ export default function RoomGuest() {
   ]);
 
   useEffect(() => {
-    if (justDisconnected) {
-      setIsModalDismissed(false);
+    if (justDisconnected && selectedModel === "tofa-offline" && isOfflineModelDownloaded) {
+      setNotification({
+        title: "Offline Mode",
+        message: "Koneksi terputus. Beralih ke mode offline otomatis."
+      });
     }
   }, [justDisconnected]);
 
@@ -187,6 +184,18 @@ export default function RoomGuest() {
     onDone: onWsDone,
   });
 
+  // --- Handle Initial Prompt ---
+  useEffect(() => {
+    const isReady = ws.status === "open" || selectedModel === "tofa-offline";
+    if (prompt && guestMessages.length === 0 && isReady && !isSending) {
+      const timer = setTimeout(() => {
+        onSend(undefined, prompt as string);
+        router.setParams({ prompt: undefined });
+      }, 200);
+      return () => clearTimeout(timer);
+    }
+  }, [prompt, ws.status, selectedModel, guestMessages.length, isSending]);
+
   // --- Initial Prompt ---
   const onSend = async (e?: React.FormEvent, overrideText?: string) => {
     if (e) e.preventDefault();
@@ -212,7 +221,10 @@ export default function RoomGuest() {
 
     const wsOk = await ws.send(text, guestConversationId);
     if (!wsOk) {
-      alert("Gagal mengirim pesan. Pastikan koneksi atau model sudah siap.");
+      setNotification({
+        title: "Koneksi Bermasalah",
+        message: "Gagal mengirim pesan. Pastikan koneksi atau model sudah siap."
+      });
       setIsSending(false);
     }
   };
@@ -457,9 +469,11 @@ export default function RoomGuest() {
       </KeyboardAvoidingView>
 
       {/* ===== MODALS & OVERLAYS ===== */}
-      <NoInternetModal
-        visible={!isNetworkConnected && !isModalDismissed}
-        onClose={() => setIsModalDismissed(true)}
+      <NotificationModal
+        visible={!!notification}
+        title={notification?.title}
+        message={notification?.message}
+        onClose={() => setNotification(null)}
       />
 
       <DownloadModel

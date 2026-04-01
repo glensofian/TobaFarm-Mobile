@@ -3,9 +3,11 @@ import { Modal, Text, View, TouchableOpacity, TouchableWithoutFeedback } from "r
 type Props = {
   visible: boolean;
   onClose: () => void;
+  title?: string;
+  message?: string;
 };
 
-export default function NoInternetModal({ visible, onClose }: Props) {
+export default function NotificationModal({ visible, onClose, title = "No Internet", message = "Please check your connection and try again." }: Props) {
     return (
         <Modal
             visible={visible}
@@ -20,8 +22,8 @@ export default function NoInternetModal({ visible, onClose }: Props) {
             >
                 <TouchableWithoutFeedback>
                     <View style={{ backgroundColor: 'white', padding: 24, borderRadius: 16, alignItems: 'center', width: '80%' }}>
-                        <Text style={{ fontSize: 18, fontWeight: '700', marginBottom: 8 }}>No Internet</Text>
-                        <Text style={{ textAlign: 'center', color: '#666' }}>Please check your connection and try again.</Text>
+                        <Text style={{ fontSize: 18, fontWeight: '700', marginBottom: 8, textAlign: "center" }}>{title}</Text>
+                        <Text style={{ textAlign: 'center', color: '#666', lineHeight: 20 }}>{message}</Text>
                         
                         <TouchableOpacity 
                             onPress={onClose}

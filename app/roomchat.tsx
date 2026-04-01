@@ -23,7 +23,7 @@ import DownloadModel from '@/components/DownloadModel';
 import { useNetwork } from '@/context/NetworkContext';
 import { useNetworkStatus } from '@/hooks/useNetworkStatus';
 import * as FileSystem from 'expo-file-system/legacy';
-import NoInternetModal from '../components/NoInternetModal';
+import NotificationModal from '../components/NotificationModal';
 import { MODEL_CONFIG } from '../constants/modelConfig';
 import { models } from '../constants/models';
 import { ChatRepository } from '../data/repositories/ChatRepository';
@@ -184,6 +184,7 @@ export default function RoomChat() {
   const [apiError, setApiError] = useState(false);
   const [messagesByConversation, setMessagesByConversation] = useState<Record<string, Message[]>>({});
   const [activeConversationId, setActiveConversationId] = useState("");
+  const [notification, setNotification] = useState<{title: string, message: string} | null>(null);
 
   const availableModels = models;
 
@@ -322,44 +323,30 @@ export default function RoomChat() {
   useEffect(() => {
     if (isInternetReachable === false && selectedModel !== 'tofa-offline') {
       setSelectedModel('tofa-offline');
-      Alert.alert(
-        'Offline',
-        'Koneksi internet terputus. Beralih ke model Tofa Offline.'
-      );
+      setNotification({
+        title: 'Offline',
+        message: 'Koneksi internet terputus. Beralih ke model Tofa Offline otomatis.'
+      });
+      setMode("offline");
+      console.log("Mode: offline (switched via reachability)");
     }
   }, [isInternetReachable, selectedModel]);
-
-  // Handle connection loss
-  useEffect(() => {
-    if (justDisconnected) {
-      console.log("🔴 Lost internet - switching to offline mode");
-      setMode("offline");
-      setIsModalDismissed(false); // Reset dismissal on new disconnect
-
-      console.log("Mode: offline (switched)");
-      // Show user notification
-      Alert.alert(
-        'Offline',
-        'Koneksi internet terputus. Beralih ke model Tofa Offline.'
-      );
-    }
-  }, [justDisconnected]);
 
   // Handle connection restore
   useEffect(() => {
     if (justConnected) {
       console.log("🟢 Internet restored - switching to online mode");
       setMode("online");
+      setNotification({
+        title: 'Online',
+        message: 'Koneksi internet pulih. Menggunakan AI cloud.'
+      });
 
       // Refresh data from server
       handleLoadConversations();
       handleLoadMessages(activeConversationId);
 
       console.log("Mode: online (switched)");
-      Alert.alert(
-        'Online',
-        'Koneksi internet pulih. Menggunakan AI cloud.'
-      );
     }
   }, [justConnected, handleLoadConversations, handleLoadMessages, activeConversationId]);
 
@@ -1040,9 +1027,12 @@ const handleDeleteConversation = async (id: string) => {
         </View>
       </KeyboardAvoidingView>
 
-      <NoInternetModal
-        visible={!isNetworkConnected && !isModalDismissed}
-        onClose={() => setIsModalDismissed(true)}
+      {/* ===== MODALS & OVERLAYS ===== */}
+      <NotificationModal
+        visible={!!notification}
+        title={notification?.title}
+        message={notification?.message}
+        onClose={() => setNotification(null)}
       />
 
       <DownloadModel
