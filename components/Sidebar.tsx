@@ -245,7 +245,7 @@ export default function Sidebar({
                   onLongPress={() => setOpenMenuId(() => item.id)}
                   style={[
                     ComponentStyles.sidebarItem,
-                    item.id === activeConversationId && ComponentStyles.sidebarItemActive,
+                    String(item.id) === String(activeConversationId) && ComponentStyles.sidebarItemActive,
                     openMenuId === item.id && { zIndex: 10 },
                   ]}
                 >

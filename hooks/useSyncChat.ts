@@ -1,4 +1,3 @@
-// hooks/useSyncChat.ts
 import { useEffect, useRef, useState } from "react";
 import { createConversationsApi } from "../api/conversationsApi";
 import { ChatRepository } from "../data/repositories/ChatRepository";
@@ -25,7 +24,7 @@ export const useSyncChat = ({ user, isInternetReachable }: SyncParams) => {
     try {
       console.log("Starting chat sync...");
 
-      // 1. Sync Conversations First
+      // Sync Conversations First
       const unsyncedConvs = await ChatRepository.getUnsyncedConversations();
       for (const conv of unsyncedConvs) {
         try {
@@ -45,11 +44,10 @@ export const useSyncChat = ({ user, isInternetReachable }: SyncParams) => {
           }
         } catch (err) {
           console.error(`Failed to sync conversation ${conv.id}:`, err);
-          // Continue with others
         }
       }
 
-      // 2. Sync Messages
+      // Sync Messages
       const unsyncedMsgs = await ChatRepository.getUnsyncedMessages();
       for (const msg of unsyncedMsgs) {
         try {
@@ -59,11 +57,13 @@ export const useSyncChat = ({ user, isInternetReachable }: SyncParams) => {
           );
 
           if (parentConv && parentConv.server_id) {
-            console.log(`Syncing message: ${msg.id.substring(0, 8)}...`);
+            if (msg.role === "assistant" || (msg as any).role === "bot") {
+              await ChatRepository.markMessageSynced(msg.id, "synced");
+              continue;
+            }
 
-            // Map 'assistant' role correctly if needed
-            // messagesApi expects 'user' | 'assistant'
-            const apiRole = msg.role === "assistant" ? "assistant" : "user";
+            console.log(`Syncing message: ${msg.id.substring(0, 8)}...`);
+            const apiRole: "user" | "assistant" = "user";
 
             await api.saveMessage(
               parentConv.server_id,
@@ -71,7 +71,7 @@ export const useSyncChat = ({ user, isInternetReachable }: SyncParams) => {
               msg.content,
             );
 
-            // Mark synced locally (cleanup sweep below will delete them all)
+            // Mark synced locally
             await ChatRepository.markMessageSynced(msg.id, "synced");
             console.log(` Message synced: ${msg.id}`);
           } else {
@@ -85,7 +85,6 @@ export const useSyncChat = ({ user, isInternetReachable }: SyncParams) => {
       }
 
       // Cleanup: Remove synced messages from local SQLite.
-      // We keep the conversation metadata locally so offline chats always have a parent.
       const deletedMsgs = await ChatRepository.deleteSyncedMessages();
       console.log(`✨ Chat sync completed. Removed ${deletedMsgs} synced messages. (Conversations preserved locally)`);
     } catch (err: any) {

@@ -57,10 +57,6 @@ const makeUserMsg = (text: string): Message => ({
   createdAt: nowIso(),
 });
 
-
-// --- Moved inside RoomChat to handle late initialization ---
-
-
 export default function RoomChat() {
   const { prompt } = useLocalSearchParams<{ prompt?: string }>();
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -172,7 +168,10 @@ export default function RoomChat() {
   }, [vectorStore, llm, isKnowledgeBaseLoaded]);
 
   const api = useMemo(() => createConversationsApi(), []);
-
+  const tempIdMapRef = useRef<Record<string, string>>({});
+  const lastSavedTextRef = useRef<string>(""); 
+  const hasSavedResponseRef = useRef<boolean>(false); // NEW: Strict flag to prevent any double-saving in one turn
+  const isSendingRef = useRef(false); // Ref to avoid handleLoadMessages re-creation on send
   const [input, setInput] = useState("");
   const [isSending, setIsSending] = useState(false);
   const [nickname, setNickname] = useState<string>("");
@@ -186,6 +185,20 @@ export default function RoomChat() {
   const [messagesByConversation, setMessagesByConversation] = useState<Record<string, Message[]>>({});
   const [activeConversationId, setActiveConversationId] = useState("");
   const [notification, setNotification] = useState<{title: string, message: string} | null>(null);
+
+  // --- Typing animation dots (shown while AI is responding)
+  const [typingDots, setTypingDots] = useState("");
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (isSending) {
+      interval = setInterval(() => {
+        setTypingDots((prev) => (prev.length < 3 ? prev + "." : ""));
+      }, 400);
+    } else {
+      setTypingDots("");
+    }
+    return () => clearInterval(interval);
+  }, [isSending]);
 
   const availableModels = models;
 
@@ -242,25 +255,41 @@ export default function RoomChat() {
 
     const combined = [...serverLoaded];
     localLoaded.forEach(lc => {
-      if (!combined.find(s => s.id === lc.id || s.id === lc.server_id)) {
+      const existing = combined.find(s => s.id === lc.id || s.id === lc.server_id);
+      if (!existing) {
         combined.push({
           id: lc.id,
           title: lc.title || "Percakapan Baru",
           createdAt: new Date(lc.created_at).toISOString()
         });
+      } else {
+        if ((existing.title === "Untitled" || existing.title === "Percakapan Baru") && lc.title) {
+          existing.title = lc.title;
+        }
       }
     });
 
     setConversations((prev) => {
-      const tempChats = prev.filter(c => c.id.startsWith("temp-"));
-      
-      const merged = [...tempChats];
-      combined.forEach(c => {
-        if (!merged.find(existing => existing.id === c.id)) {
-          merged.push(c);
+      const nextConversations = [...combined];
+
+      prev.forEach(prevChat => {
+        if (prevChat.id.startsWith("temp-")) {
+          const isMapped = tempIdMapRef.current[prevChat.id];
+          const alreadyInNext = nextConversations.find(c => c.id === prevChat.id || (isMapped && c.id === isMapped));
+          
+          if (!isMapped && !alreadyInNext) {
+            nextConversations.push(prevChat);
+          }
         }
       });
-      return merged;
+
+      nextConversations.sort((a, b) => {
+        const da = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const db = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        return db - da;
+      });
+
+      return nextConversations;
     });
 
     if (isApiSuccess || isInternetReachable === false) {
@@ -270,47 +299,30 @@ export default function RoomChat() {
     }
   }, [api, isInternetReachable]);
 
+  useEffect(() => { isSendingRef.current = isSending; }, [isSending]);
+
   const handleLoadMessages = useCallback(async (cid: string) => {
-    if (!cid || cid.startsWith("temp-")) return;
+    if (!cid || cid.startsWith("temp-") || isSendingRef.current) return;
 
     try {
       if (isInternetReachable) {
-        const conv = await ChatRepository.getConversation(cid);
-        // If there's a stored conversation, use its server_id (if synced)
-        // If it's not in the local DB at all (!conv), it MUST be a server conversation, so use cid directly.
-        // If it's in the DB but server_id is null, it's unsynced local, so targetId becomes null (correctly skipping fetch).
-        const targetId = conv?.server_id || (!conv ? cid : null);
-
-        if (targetId) {
-          try {
-            const serverMsgs = await api.fetchMessages(targetId);
-            if (serverMsgs.length > 0) {
-              setMessagesByConversation((prev) => ({
-                ...prev,
-                [cid]: serverMsgs,
-              }));
-              return;
-            }
-          } catch (apiErr: any) {
-            if (apiErr?.response?.status !== 404) {
-              console.warn("API message fetch error:", apiErr);
-            }
-          }
+        const serverMsgs = await api.fetchMessages(cid);
+        if (serverMsgs.length > 0) {
+          setMessagesByConversation((prev) => ({ ...prev, [cid]: serverMsgs }));
         }
-      }
-
-      // --- OFFLINE or API returned nothing: Fall back to SQLite ---
-      const localMsgs = await ChatRepository.getMessagesByConversation(cid);
-      if (localMsgs.length > 0) {
-        setMessagesByConversation((prev) => ({
-          ...prev,
-          [cid]: localMsgs.map(m => ({
-            id: m.id,
-            role: m.role === 'assistant' ? 'bot' : 'user' as any,
-            text: m.content,
-            createdAt: new Date(m.created_at).toISOString()
-          })),
-        }));
+      } else {
+        const localMsgs = await ChatRepository.getMessagesByConversation(cid);
+        if (localMsgs.length > 0) {
+          setMessagesByConversation((prev) => ({
+            ...prev,
+            [cid]: localMsgs.map(m => ({
+              id: m.id,
+              role: m.role === 'assistant' ? 'bot' : 'user' as any,
+              text: m.content,
+              createdAt: new Date(m.created_at).toISOString()
+            })),
+          }));
+        }
       }
     } catch (e) {
       console.warn("Load messages notice:", e);
@@ -396,13 +408,24 @@ export default function RoomChat() {
   useEffect(() => {
     handleLoadConversations();
   }, [handleLoadConversations]);
+  useEffect(() => {
+    if (!isDataLoaded || !activeConversationId) return;
+    if (activeConversationId.startsWith("temp-")) return;
+
+    const exists = conversations.some(c => String(c.id) === String(activeConversationId));
+    if (!exists) {
+      console.log("Restored lastConversationId not found in list, resetting to FirstCanvas.");
+      setActiveConversationId("");
+    }
+  }, [isDataLoaded, conversations, activeConversationId]);
 
   /* =======================
    LOAD MESSAGES
   ======================== */
   useEffect(() => {
+    if (!isDataLoaded) return;
     handleLoadMessages(activeConversationId);
-  }, [activeConversationId, handleLoadMessages]);
+  }, [activeConversationId, handleLoadMessages, isDataLoaded]);
 
 // Redirect Home if Conversation = []
   useEffect(() => {
@@ -430,9 +453,6 @@ useEffect(() => {
     return () => clearTimeout(timer);
   }
 }, [prompt, isKnowledgeBaseLoaded, isDataLoaded]);
-
-  const tempIdMapRef = useRef<Record<string, string>>({});
-
 
   // const [lang, setLang] = useState<Lang>(() => {
   //   const saved = String(getValueFor("lang"));
@@ -559,14 +579,13 @@ const handleDeleteConversation = async (id: string) => {
   const messages = messagesByConversation[activeConversationId] || [];
 
   const onWsToken = useCallback((cid: string, token: string) => {
-    // Resolve target ID (handle temp -> real mapping)
+    setIsSending(true);
     const realId = tempIdMapRef.current[cid] || cid;
 
     setMessagesByConversation((prev) => {
       const threadMsgs = prev[realId] ?? [];
       const lastMsg = threadMsgs[threadMsgs.length - 1];
 
-      // Simplified: if last msg is bot, append.
       if (lastMsg && lastMsg.role === "bot") {
         return {
           ...prev,
@@ -592,52 +611,44 @@ const handleDeleteConversation = async (id: string) => {
     async (cid: string, fullText: string) => {
       let targetId = cid;
 
-      // Check if it's a temp ID and resolve to real ID (only for online chats)
-      if (cid.startsWith("temp-")) {
-        // For offline model, we keep the temp- ID as it's our only local ID
-        if (selectedModel === 'tofa-offline') {
-          targetId = cid;
-        } else {
-          targetId = tempIdMapRef.current[cid] || "";
-
-          // Retry if mapping not ready yet (race condition)
-          if (!targetId) {
-            console.log("Waiting for real ID mapping...", cid);
-            await new Promise(r => setTimeout(r, 1000));
-            targetId = tempIdMapRef.current[cid] || "";
-          }
-        }
+      if (tempIdMapRef.current[cid]) {
+        targetId = tempIdMapRef.current[cid];
       }
 
       if (!targetId) {
-        // The backend might send global messages (like "Server is warming up") before a chat starts.
-        // We do not need to save these to the database.
         return;
       }
 
       try {
-        if (!fullText) return;
+        if (!fullText || hasSavedResponseRef.current) return;
+        if (fullText === lastSavedTextRef.current) return;
+
+        hasSavedResponseRef.current = true;
+        lastSavedTextRef.current = fullText;
+
         if (selectedModel === 'tofa-offline') {
-          if (isInternetReachable) {
-            // ONLINE with OFFLINE MODEL: Save to API directly
-            api.saveMessage(targetId, "assistant", fullText).catch(e => console.warn("API AI save failed:", e));
-          } else {
-            // STRICTLY OFFLINE: Save to SQLite
-            await ChatRepository.saveMessage({
-              conversation_id: targetId,
-              role: 'assistant',
-              content: fullText,
-              is_synced: false
-            });
-          }
+          await ChatRepository.saveMessage({
+            conversation_id: targetId,
+            role: 'assistant',
+            content: fullText,
+            is_synced: false
+          });
         } else {
-          await api.saveMessage(targetId, "assistant", fullText);
+          await api.saveMessage(targetId, "assistant", fullText).catch(e => {
+            console.warn("Failed to persist AI response on server:", e);
+            hasSavedResponseRef.current = false;
+          });
         }
       } catch (e) {
         console.error("Failed to save assistant message:", e);
+      } finally {
+        setTimeout(() => {
+          setIsSending(false);
+          setIsDataLoaded(true);
+        }, 500);
       }
     },
-    [authHeaders, selectedModel],
+    [api, selectedModel],
   );
 
   const ws = useWebSocketChat({
@@ -660,10 +671,14 @@ const handleDeleteConversation = async (id: string) => {
     const text = (overrideText ?? input).trim();
     if (!text || isSending) return;
 
+    lastSavedTextRef.current = ""; 
+    hasSavedResponseRef.current = false; // Reset flag for new exchange
     setIsSending(true);
     let threadId = forceNewChat ? "" : activeConversationId;
     const isNewChat = !threadId;
     const generatedTitle = truncateTitle(text, 28);
+
+    const isOffline = selectedModel === 'tofa-offline';
 
     if (isNewChat) {
       threadId = "temp-" + uid("t");
@@ -674,19 +689,16 @@ const handleDeleteConversation = async (id: string) => {
         ...prev,
       ]);
 
-      if (selectedModel === 'tofa-offline') {
-        const now = Date.now();
+      if (isOffline) {
         try {
-          console.log("[Offline] Pre-saving conversation to DB:", threadId);
           await ChatRepository.saveConversation({
             id: threadId,
             title: generatedTitle,
-            created_at: now,
+            created_at: Date.now(),
             is_synced: false
           });
-          console.log("[Offline] Conversation saved successfully.");
         } catch (err) {
-          console.error("Failed to save new chat locally:", err);
+          console.error("Failed to pre-save local chat:", err);
         }
       }
     }
@@ -698,36 +710,23 @@ const handleDeleteConversation = async (id: string) => {
     }));
     setInput("");
 
-    const wsText = nickname || ""
-      ? `The user has asked you to call him ${nickname}. ${text}`
-      : text;
-    const isOffline = selectedModel === 'tofa-offline';
-
     if (isOffline) {
-      if (isInternetReachable) {
-        api.saveMessage(threadId, "user", text).catch(e => console.warn("API save failed:", e));
-      } else {
-        try {
-          const exists = await ChatRepository.getConversation(threadId);
-          if (!exists) {
-            await ChatRepository.saveConversation({
-              id: threadId,
-              title: generatedTitle,
-              created_at: Date.now(),
-              is_synced: false,
-            });
-          }
-          await ChatRepository.saveMessage({
-            conversation_id: threadId,
-            role: 'user',
-            content: text,
-            is_synced: false
-          });
-        } catch (e) {
-          console.error("Failed to save user message locally:", e);
-        }
+      try {
+        await ChatRepository.saveMessage({
+          conversation_id: threadId,
+          role: 'user',
+          content: text,
+          is_synced: false
+        });
+      } catch (e) {
+        console.warn("User message local save failed:", e);
       }
     }
+
+    // WS Logic
+    const wsText = nickname
+      ? `The user has asked you to call him ${nickname}. ${text}`
+      : text;
 
     const wsOk = await ws.send(wsText, threadId);
     if (!wsOk && !isOffline) {
@@ -737,54 +736,44 @@ const handleDeleteConversation = async (id: string) => {
     }
 
     if (isNewChat && !isOffline) {
+      // ONLINE + NEW CHAT: Create conversation on server
       try {
         const data = await api.createConversation();
         if (data?.id) {
           const realId = data.id;
-          tempIdMapRef.current[threadId] = realId;
-
-          // Swap "temp" state to "real" state
-          setMessagesByConversation((prev) => {
-            const { [threadId]: tempMsgs, ...rest } = prev;
-            return { ...rest, [realId]: tempMsgs ?? [userMsg] };
-          });
+          const oldTempId = threadId; 
+          tempIdMapRef.current[oldTempId] = realId; 
 
           setConversations((prev) =>
-            prev.map((c) => (c.id === threadId ? { ...c, id: realId, title: generatedTitle } : c))
+            prev.map((c) => (c.id === oldTempId ? { ...c, id: realId, title: generatedTitle } : c))
           );
+          setMessagesByConversation((prev) => {
+            const { [oldTempId]: m, ...rest } = prev;
+            return { ...rest, [realId]: m ?? [userMsg] };
+          });
 
-          setActiveConversationId(realId);
           threadId = realId;
+          setActiveConversationId(realId);
 
-          await api.renameConversation(realId, generatedTitle).catch(e => console.error("Gagal rename di server", e));
+          api.renameConversation(realId, generatedTitle).catch(e => console.error("Gagal rename di server", e));
+          api.saveMessage(realId, "user", text).catch(e => console.error("API user msg save failed:", e));
         }
       } catch (e) {
         console.error("Failed to create real conversation:", e);
       }
     } else if (!isNewChat && !isOffline) {
-        const currentConv = conversations.find(c => c.id === threadId);
-        if (currentConv && (currentConv.title === "Percakapan Baru" || currentConv.title === "Untitled")) {
-             // Rename in Backend 
-             api.renameConversation(threadId, generatedTitle).catch(e => console.warn("Failed to rename old chat", e));
-             
-             // Rename in Frontend
-             setConversations((prev) =>
-                prev.map((c) =>
-                c.id === threadId ? { ...c, title: generatedTitle, updatedAt: nowIso() } : c
-                )
-            );
-        }
-    }
+      // ONLINE + EXISTING CHAT
+      api.saveMessage(threadId, "user", text).catch(e => console.error("API save failed:", e));
 
-    if (!isOffline) {
-      try {
-        await api.saveMessage(threadId, "user", text);
-      } catch (e) {
-        console.error("Failed to save user message:", e);
+      const currentConv = conversations.find(c => c.id === threadId);
+      if (currentConv && (currentConv.title === "Percakapan Baru" || currentConv.title === "Untitled")) {
+        api.renameConversation(threadId, generatedTitle).catch(e => console.warn("Failed to rename old chat", e));
+        setConversations((prev) =>
+          prev.map((c) => c.id === threadId ? { ...c, title: generatedTitle } : c)
+        );
       }
+    } else if (isOffline) {
     }
-
-    setIsSending(false);
   };
 
 
@@ -974,9 +963,14 @@ const handleDeleteConversation = async (id: string) => {
             </View>
 
             {/* ===== INPUT ===== */}
-            <View style={[Layout.chatInputContainer, { paddingBottom: (isKeyboardVisible && !sidebarOpen) ? 10 : insets.bottom + 10 }]}>
+            <View
+              pointerEvents={isSending ? "none" : "auto"}
+              style={[Layout.chatInputContainer, { paddingBottom: (isKeyboardVisible && !sidebarOpen) ? 10 : insets.bottom + 10 }]}
+            >
               <ChatInput
                 model={selectedModel}
+                isLoading={isSending}
+                placeholder={isSending ? `ToFa Sedang Menjawab${typingDots}` : "Tanyakan sesuatu..."}
                 onSend={(text) => onSend(undefined, text)}
               />
             </View>

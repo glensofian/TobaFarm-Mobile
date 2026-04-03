@@ -1,4 +1,3 @@
-// src/hooks/useNetworkStatus.ts
 import { useEffect, useState, useCallback, useRef } from "react";
 import NetInfo from "@react-native-community/netinfo";
 
@@ -18,10 +17,9 @@ export const useNetworkStatus = () => {
   const [justDisconnected, setJustDisconnected] = useState(false);
   const [justConnected, setJustConnected] = useState(false);
 
-  const connectionRef = useRef<boolean>(false);
+  const connectionRef = useRef<boolean | null>(null);
 
   useEffect(() => {
-    // 1. Get initial state
     NetInfo.fetch().then((state) => {
       const isConnected = state.isConnected ?? false;
       connectionRef.current = isConnected;
@@ -32,23 +30,23 @@ export const useNetworkStatus = () => {
       });
     });
 
-    // 2. Subscribe to updates (Event-Driven!)
     const unsubscribe = NetInfo.addEventListener((state) => {
       const wasConnected = connectionRef.current;
       const isNowConnected = state.isConnected ?? false;
 
-      // Detect transition events
-      if (wasConnected && !isNowConnected) {
-        setJustDisconnected(true);
-        setTimeout(() => setJustDisconnected(false), 2000); // 2s for better visibility
+      if (wasConnected !== null) {
+        if (wasConnected && !isNowConnected) {
+          setJustDisconnected(true);
+          setTimeout(() => setJustDisconnected(false), 2000);
+        }
+
+        if (!wasConnected && isNowConnected) {
+          setJustConnected(true);
+          setTimeout(() => setJustConnected(false), 2000);
+        }
       }
 
-      if (!wasConnected && isNowConnected) {
-        setJustConnected(true);
-        setTimeout(() => setJustConnected(false), 2000); // 2s for better visibility
-      }
-
-      connectionRef.current = isNowConnected; // Update for next event
+      connectionRef.current = isNowConnected;
       setNetworkState({
         isConnected: isNowConnected,
         type: state.type,
@@ -56,15 +54,13 @@ export const useNetworkStatus = () => {
       });
     });
 
-    // 3. Cleanup on unmount
     return () => {
       unsubscribe();
     };
-  }, []); // Run once on mount
-
+  }, []);
   return {
     ...networkState,
-    justDisconnected, // True for 1 second after losing connection
-    justConnected,    // True for 1 second after gaining connection
+    justDisconnected,
+    justConnected,
   };
 };

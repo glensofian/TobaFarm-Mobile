@@ -1,6 +1,6 @@
-import { View, TextInput, TouchableOpacity, Alert } from 'react-native';
+import { View, TextInput, TouchableOpacity, Alert, Keyboard } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   ComponentStyles,
   ComponentTextStyles,
@@ -12,14 +12,23 @@ type Props = {
   onSend?: (text: string) => void;
   model?: string;
   placeholder?: string;
+  isLoading?: boolean;
 };
 
-export default function ChatInput({ onSend, model, placeholder }: Props) {
+export default function ChatInput({ onSend, model, placeholder, isLoading }: Props) {
   const [value, setValue] = useState('');
   const { isInternetReachable, isConnected } = useNetwork();
+  const inputRef = useRef<TextInput>(null);
+
+  useEffect(() => {
+    if (isLoading) {
+      inputRef.current?.blur();
+      Keyboard.dismiss();
+    }
+  }, [isLoading]);
 
   const handleSend = () => {
-    if (!value.trim()) return;
+    if (isLoading || !value.trim()) return;
     if (model !== 'tofa-offline' && (!isInternetReachable || !isConnected)) {
       Alert.alert('No Internet', 'Please check your internet connection');
       return;
@@ -29,12 +38,17 @@ export default function ChatInput({ onSend, model, placeholder }: Props) {
   };
 
   return (
-    <View style={ComponentStyles.chatInputWrapper}>
+    <View style={[
+      ComponentStyles.chatInputWrapper,
+      isLoading && { opacity: 0.75 }
+    ]}>
       <TextInput
+        ref={inputRef}
         value={value}
         onChangeText={setValue}
-        placeholder={placeholder || "Tanyakan sesuatu..."}
+        placeholder={isLoading ? "AI sedang menjawab..." : (placeholder || "Tanyakan sesuatu...")}
         placeholderTextColor={Colors.placeholder}
+        editable={!isLoading}
         style={[
           ComponentTextStyles.chatInputText,
         ]}
@@ -45,8 +59,13 @@ export default function ChatInput({ onSend, model, placeholder }: Props) {
       <TouchableOpacity
         style={ComponentStyles.chatInputAction}
         onPress={handleSend}
+        disabled={isLoading}
       >
-        <Ionicons name="send" size={18} color={Colors.black} />
+        <Ionicons
+          name="send"
+          size={18}
+          color={isLoading ? Colors.placeholder : Colors.black}
+        />
       </TouchableOpacity>
     </View>
   );

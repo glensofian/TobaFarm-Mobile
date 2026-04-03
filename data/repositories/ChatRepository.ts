@@ -149,6 +149,14 @@ export const ChatRepository = {
     );
   },
 
+  async updateMessagesConversationId(oldId: string, newId: string): Promise<void> {
+    const db = await getDatabase();
+    await db.runAsync(
+      `UPDATE messages SET conversation_id = ? WHERE conversation_id = ?`,
+      newId, oldId
+    );
+  },
+
   // ========== CLEANUP ==========
 
   // Delete all messages that have been successfully synced to the server.
