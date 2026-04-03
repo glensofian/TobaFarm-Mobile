@@ -200,6 +200,90 @@ export default function RoomChat() {
     return () => clearInterval(interval);
   }, [isSending]);
 
+
+  const onWsToken = useCallback((cid: string, token: string) => {
+    setIsSending(true);
+    const realId = tempIdMapRef.current[cid] || cid;
+
+    setMessagesByConversation((prev) => {
+      const threadMsgs = prev[realId] ?? [];
+      const lastMsg = threadMsgs[threadMsgs.length - 1];
+
+      if (lastMsg && lastMsg.role === "bot") {
+        return {
+          ...prev,
+          [realId]: [
+            ...threadMsgs.slice(0, -1),
+            { ...lastMsg, text: lastMsg.text + token },
+          ],
+        };
+      }
+
+      // Otherwise create a new bot message
+      return {
+        ...prev,
+        [realId]: [
+          ...threadMsgs,
+          { id: uid("m"), role: "bot", text: token, createdAt: nowIso() },
+        ],
+      };
+    });
+  }, []);
+
+  const onWsDone = useCallback(
+    async (cid: string, fullText: string) => {
+      let targetId = cid;
+
+      if (tempIdMapRef.current[cid]) {
+        targetId = tempIdMapRef.current[cid];
+      }
+
+      if (!targetId) {
+        return;
+      }
+
+      try {
+        if (!fullText || hasSavedResponseRef.current) return;
+        if (fullText === lastSavedTextRef.current) return;
+
+        hasSavedResponseRef.current = true;
+        lastSavedTextRef.current = fullText;
+
+        if (selectedModel === 'tofa-offline') {
+          await ChatRepository.saveMessage({
+            conversation_id: targetId,
+            role: 'assistant',
+            content: fullText,
+            is_synced: false
+          });
+        } else {
+          await api.saveMessage(targetId, "assistant", fullText).catch(e => {
+            console.warn("Failed to persist AI response on server:", e);
+            hasSavedResponseRef.current = false;
+          });
+        }
+      } catch (e) {
+        console.error("Failed to save assistant message:", e);
+      } finally {
+        setTimeout(() => {
+          setIsSending(false);
+          setIsDataLoaded(true);
+        }, 500);
+      }
+    },
+    [api, selectedModel],
+  );
+
+  const ws = useWebSocketChat({
+    model: selectedModel,
+    enabled: true,
+    getActiveConversationId: () => activeConversationId,
+    onToken: onWsToken,
+    onDone: onWsDone,
+    vectorStore,
+    llm,
+  });
+
   const availableModels = models;
 
   // --- Derived
@@ -442,7 +526,11 @@ export default function RoomChat() {
   }, [isDataLoaded, isSyncing, conversations.length, activeConversationId, prompt, apiError,router]);
 
 useEffect(() => {
-  if (prompt && isKnowledgeBaseLoaded && isDataLoaded) {
+  const isTargetOffline = selectedModel === 'tofa-offline';
+  const isWsReady = ws.status === 'open';
+  const isReady = isDataLoaded && (isTargetOffline ? isKnowledgeBaseLoaded : isWsReady);
+
+  if (prompt && isReady && !isSending) {
     console.log("AI Ready! Processing prompt:", prompt);
 
     const timer = setTimeout(() => {
@@ -452,7 +540,7 @@ useEffect(() => {
 
     return () => clearTimeout(timer);
   }
-}, [prompt, isKnowledgeBaseLoaded, isDataLoaded]);
+}, [prompt, isDataLoaded, isKnowledgeBaseLoaded, selectedModel, ws.status, isSending]);
 
   // const [lang, setLang] = useState<Lang>(() => {
   //   const saved = String(getValueFor("lang"));
@@ -528,11 +616,28 @@ const handleDeleteConversation = async (id: string) => {
     }
   };
 
-  const activeMessages = (messagesByConversation[activeConversationId] || []).map((m) => ({
-    id: m.id,
-    type: m.role === 'bot' || (m as any).role === 'assistant' ? 'ai' : 'user',
-    text: m.text,
-  }));
+  const activeMessages = useMemo(() => {
+    const threadMsgs = activeConversationId ? (messagesByConversation[activeConversationId] || []) : [];
+    
+    if (threadMsgs.length > 0) {
+      return threadMsgs.map((m) => ({
+        id: m.id,
+        type: m.role === 'bot' || (m as any).role === 'assistant' ? 'ai' : 'user',
+        text: m.text,
+      }));
+    }
+
+    // Fallback: If we have a prompt but no messages in state yet, show the prompt
+    if (prompt && !activeConversationId) {
+      return [{
+        id: 'initial-prompt',
+        type: 'user',
+        text: prompt,
+      }];
+    }
+
+    return [];
+  }, [activeConversationId, messagesByConversation, prompt]);
 
   const getActiveConversationId = useCallback(
     () => activeConversationId,
@@ -578,88 +683,7 @@ const handleDeleteConversation = async (id: string) => {
 
   const messages = messagesByConversation[activeConversationId] || [];
 
-  const onWsToken = useCallback((cid: string, token: string) => {
-    setIsSending(true);
-    const realId = tempIdMapRef.current[cid] || cid;
 
-    setMessagesByConversation((prev) => {
-      const threadMsgs = prev[realId] ?? [];
-      const lastMsg = threadMsgs[threadMsgs.length - 1];
-
-      if (lastMsg && lastMsg.role === "bot") {
-        return {
-          ...prev,
-          [realId]: [
-            ...threadMsgs.slice(0, -1),
-            { ...lastMsg, text: lastMsg.text + token },
-          ],
-        };
-      }
-
-      // Otherwise create a new bot message
-      return {
-        ...prev,
-        [realId]: [
-          ...threadMsgs,
-          { id: uid("m"), role: "bot", text: token, createdAt: nowIso() },
-        ],
-      };
-    });
-  }, []);
-
-  const onWsDone = useCallback(
-    async (cid: string, fullText: string) => {
-      let targetId = cid;
-
-      if (tempIdMapRef.current[cid]) {
-        targetId = tempIdMapRef.current[cid];
-      }
-
-      if (!targetId) {
-        return;
-      }
-
-      try {
-        if (!fullText || hasSavedResponseRef.current) return;
-        if (fullText === lastSavedTextRef.current) return;
-
-        hasSavedResponseRef.current = true;
-        lastSavedTextRef.current = fullText;
-
-        if (selectedModel === 'tofa-offline') {
-          await ChatRepository.saveMessage({
-            conversation_id: targetId,
-            role: 'assistant',
-            content: fullText,
-            is_synced: false
-          });
-        } else {
-          await api.saveMessage(targetId, "assistant", fullText).catch(e => {
-            console.warn("Failed to persist AI response on server:", e);
-            hasSavedResponseRef.current = false;
-          });
-        }
-      } catch (e) {
-        console.error("Failed to save assistant message:", e);
-      } finally {
-        setTimeout(() => {
-          setIsSending(false);
-          setIsDataLoaded(true);
-        }, 500);
-      }
-    },
-    [api, selectedModel],
-  );
-
-  const ws = useWebSocketChat({
-    model: selectedModel,
-    enabled: true,
-    getActiveConversationId,
-    onToken: onWsToken,
-    onDone: onWsDone,
-    vectorStore,
-    llm,
-  });
 
   const handleStop = () => {
     ws.stop();
@@ -948,7 +972,7 @@ const handleDeleteConversation = async (id: string) => {
         behavior={Platform.OS === "ios" ? "padding" : "padding"}
         enabled={Platform.OS === "ios" || (isKeyboardVisible && !sidebarOpen)}
       >
-        {activeConversationId ? (
+        {activeConversationId || prompt ? (
           <>
             {/* ===== CHAT LIST ===== */}
             <View style={ComponentStyles.chatListContainer}>
