@@ -62,7 +62,14 @@ export default function ChatBubble({ type, text }: any) {
       <TouchableOpacity
         activeOpacity={0.9}
         onLongPress={handleLongPress}
-        style={ComponentStyles.chatBubbleAI}
+        style={[
+          ComponentStyles.chatBubbleAI,
+          { 
+            marginLeft: -4,
+            borderTopLeftRadius: 2,
+            padding: 12 
+          }
+        ]}
       >
         <MarkdownText
           text={text}
