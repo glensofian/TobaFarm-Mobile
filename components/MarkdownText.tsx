@@ -7,7 +7,7 @@ import { Text, View, StyleSheet } from 'react-native';
      *italic*        → Montserrat-Italic
      ***bold-italic***
      `code`          → inline code highlight (Montserrat-Medium)
-     # / ## / ###    → heading (SemiBold / Bold)
+     # to ######    → heading levels
      - / * / +       → unordered list
      1. 2.           → ordered list
      ---             → horizontal separator
@@ -134,6 +134,9 @@ type Block =
   | { kind: 'h1'; raw: string }
   | { kind: 'h2'; raw: string }
   | { kind: 'h3'; raw: string }
+  | { kind: 'h4'; raw: string }
+  | { kind: 'h5'; raw: string }
+  | { kind: 'h6'; raw: string }
   | { kind: 'bullet'; raw: string }
   | { kind: 'ordered'; index: number; raw: string }
   | { kind: 'hr' }
@@ -167,6 +170,9 @@ function parseBlocks(text: string): Block[] {
     if (/^# (.+)/.test(line))       { blocks.push({ kind: 'h1', raw: line.replace(/^# /, '') }); continue; }
     if (/^## (.+)/.test(line))      { blocks.push({ kind: 'h2', raw: line.replace(/^## /, '') }); continue; }
     if (/^### (.+)/.test(line))     { blocks.push({ kind: 'h3', raw: line.replace(/^### /, '') }); continue; }
+    if (/^#### (.+)/.test(line))    { blocks.push({ kind: 'h4', raw: line.replace(/^#### /, '') }); continue; }
+    if (/^##### (.+)/.test(line))   { blocks.push({ kind: 'h5', raw: line.replace(/^##### /, '') }); continue; }
+    if (/^###### (.+)/.test(line))  { blocks.push({ kind: 'h6', raw: line.replace(/^###### /, '') }); continue; }
 
     const bullet = line.match(/^\s*[*\-+] (.+)/);
     if (bullet)                     { blocks.push({ kind: 'bullet', raw: bullet[1] }); continue; }
@@ -194,7 +200,6 @@ export default function MarkdownText({ text, fontSize = 13, color = '#E6ECF2' }:
     <View>
       {blocks.map((block, i) => {
         switch (block.kind) {
-
           case 'h1':
             return (
               <InlineText
@@ -205,7 +210,6 @@ export default function MarkdownText({ text, fontSize = 13, color = '#E6ECF2' }:
                 extraStyle={[styles.h1]}
               />
             );
-
           case 'h2':
             return (
               <InlineText
@@ -216,7 +220,6 @@ export default function MarkdownText({ text, fontSize = 13, color = '#E6ECF2' }:
                 extraStyle={[styles.h2]}
               />
             );
-
           case 'h3':
             return (
               <InlineText
@@ -227,7 +230,36 @@ export default function MarkdownText({ text, fontSize = 13, color = '#E6ECF2' }:
                 extraStyle={[styles.h3]}
               />
             );
-
+          case 'h4':
+            return (
+              <InlineText
+                key={i}
+                raw={block.raw}
+                baseFontSize={fontSize + 1}
+                baseColor={color}
+                extraStyle={[styles.h4]}
+              />
+            );
+          case 'h5':
+            return (
+              <InlineText
+                key={i}
+                raw={block.raw}
+                baseFontSize={fontSize}
+                baseColor={color}
+                extraStyle={[styles.h5]}
+              />
+            );
+          case 'h6':
+            return (
+              <InlineText
+                key={i}
+                raw={block.raw}
+                baseFontSize={fontSize - 1}
+                baseColor={color}
+                extraStyle={[styles.h6]}
+              />
+            );
           case 'bullet':
             return (
               <View key={i} style={styles.listRow}>
@@ -240,7 +272,6 @@ export default function MarkdownText({ text, fontSize = 13, color = '#E6ECF2' }:
                 />
               </View>
             );
-
           case 'ordered':
             return (
               <View key={i} style={styles.listRow}>
@@ -255,12 +286,10 @@ export default function MarkdownText({ text, fontSize = 13, color = '#E6ECF2' }:
                 />
               </View>
             );
-
           case 'hr':
             return (
               <View key={i} style={[styles.hr, { borderBottomColor: color + '55' }]} />
             );
-
           case 'code-block':
             return (
               <View key={i} style={styles.codeBlock}>
@@ -272,10 +301,8 @@ export default function MarkdownText({ text, fontSize = 13, color = '#E6ECF2' }:
                 </Text>
               </View>
             );
-
           case 'empty':
             return <View key={i} style={{ height: 5 }} />;
-
           case 'paragraph':
           default:
             return (
@@ -309,6 +336,21 @@ const styles = StyleSheet.create({
     fontFamily: 'Montserrat-SemiBold',
     marginTop: 6,
     marginBottom: 3,
+  },
+  h4: {
+    fontFamily: 'Montserrat-SemiBold',
+    marginTop: 5,
+    marginBottom: 2,
+  },
+  h5: {
+    fontFamily: 'Montserrat-SemiBold',
+    marginTop: 4,
+    marginBottom: 2,
+  },
+  h6: {
+    fontFamily: 'Montserrat-SemiBold',
+    marginTop: 3,
+    marginBottom: 1,
   },
   listRow: {
     flexDirection: 'row',
