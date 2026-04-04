@@ -7,13 +7,12 @@ import {
   Platform,
   Pressable,
   ScrollView,
-  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View
 } from 'react-native';
-import { Colors } from '../styles';
+import { ComponentStyles, ComponentTextStyles } from '../styles';
 
 type SettingsModalProps = {
   visible: boolean;
@@ -52,41 +51,41 @@ export default function SettingsModal({
       onRequestClose={onClose}
       statusBarTranslucent={true}
     >
-      <View style={styles.overlay}>
+      <View style={ComponentStyles.settingsOverlay}>
         <KeyboardAvoidingView
-          behavior={Platform.OS === "ios" ? "padding" : undefined}
-          style={styles.keyboardView}
+          behavior={Platform.OS === "ios" ? "padding" : "padding"}
+          style={ComponentStyles.settingsKeyboardView}
         >
-          <Pressable style={styles.pressableOverlay} onPress={onClose}>
-            <View style={styles.modalContainer} onStartShouldSetResponder={() => true}>
+          <Pressable style={ComponentStyles.settingsPressableOverlay} onPress={onClose}>
+            <View style={ComponentStyles.settingsModalContainer} onStartShouldSetResponder={() => true}>
               {/* Header */}
-              <View style={styles.header}>
-                <Text style={styles.headerTitle}>Pengaturan</Text>
-                <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
-                  <Ionicons name="close" size={24} color={Colors.black} />
+              <View style={ComponentStyles.settingsHeader}>
+                <Text style={ComponentTextStyles.settingsHeaderTitle}>Pengaturan</Text>
+                <TouchableOpacity onPress={onClose} style={ComponentStyles.settingsCloseBtn}>
+                  <Ionicons name="close" size={24} color={'#000'} />
                 </TouchableOpacity>
               </View>
 
               <ScrollView
                 showsVerticalScrollIndicator={false}
-                contentContainerStyle={styles.scrollContent}
+                contentContainerStyle={ComponentStyles.settingsScrollContent}
                 keyboardShouldPersistTaps="handled"
               >
 
                 {/* Bahasa */}
-                <View style={styles.settingRow}>
-                  <Text style={styles.label}>Bahasa</Text>
-                  <TouchableOpacity style={styles.dropdownBtn}>
-                    <Text style={styles.dropdownText}>{selectedLanguage}</Text>
-                    <Ionicons name="chevron-down" size={16} color="#666" />
+                <View style={ComponentStyles.settingsRow}>
+                  <Text style={ComponentTextStyles.settingsLabel}>Bahasa</Text>
+                  <TouchableOpacity style={ComponentStyles.settingsDropdownBtn}>
+                    <Text style={ComponentTextStyles.settingsDropdownText}>{selectedLanguage}</Text>
+                    <Ionicons name="chevron-down" size={16} color="#000" />
                   </TouchableOpacity>
                 </View>
 
                 {/* Nama Panggilan */}
-                <View style={styles.settingRow}>
-                  <Text style={styles.label}>Nama Panggilan</Text>
+                <View style={ComponentStyles.settingsRow}>
+                  <Text style={ComponentTextStyles.settingsLabel}>Nama Panggilan</Text>
                   <TextInput
-                    style={styles.input}
+                    style={ComponentStyles.settingsInput}
                     value={nickname} // Gunakan state nickname langsung tanpa || username
                     onChangeText={setNickname}
                     placeholder={username || "Nama"} // Username tetap ada sebagai bayangan (placeholder)
@@ -96,10 +95,10 @@ export default function SettingsModal({
                 </View>
 
                 {/* Hapus Semua Chat */}
-                <View style={styles.settingRow}>
-                  <Text style={styles.label}>Hapus Semua Chat</Text>
+                <View style={ComponentStyles.settingsRow}>
+                  <Text style={ComponentTextStyles.settingsLabel}>Hapus Semua Chat</Text>
                   <TouchableOpacity 
-                    style={styles.actionBtn} 
+                    style={ComponentStyles.settingsActionBtn} 
                     onPress={() => {
                         Alert.alert(
                           "Hapus Semua Chat",
@@ -111,31 +110,31 @@ export default function SettingsModal({
                         );
                     }}
                   >
-                    <Text style={[styles.actionText, { color: '#D32F2F' }]}>Hapus</Text>
+                    <Text style={[ComponentTextStyles.settingsActionText, { color: '#D32F2F' }]}>Hapus</Text>
                     <Ionicons name="trash-outline" size={18} color="#D32F2F" style={{ marginLeft: 6 }} />
                   </TouchableOpacity>
                 </View>
 
                 {/* Keluar dari akun */}
-                <View style={styles.settingRow}>
-                  <Text style={styles.label}>Keluar dari akun</Text>
-                  <TouchableOpacity style={styles.actionBtn} onPress={onLogout}>
-                    <Text style={styles.actionText}>Keluar</Text>
-                    <Ionicons name="log-out-outline" size={18} color={Colors.black} style={{ marginLeft: 6 }} />
+                <View style={ComponentStyles.settingsRow}>
+                  <Text style={ComponentTextStyles.settingsLabel}>Keluar dari akun</Text>
+                  <TouchableOpacity style={ComponentStyles.settingsActionBtn} onPress={onLogout}>
+                    <Text style={ComponentTextStyles.settingsActionText}>Keluar</Text>
+                    <Ionicons name="log-out-outline" size={18} color={'#000'} style={{ marginLeft: 6 }} />
                   </TouchableOpacity>
                 </View>
 
                 {/* Ganti Kata Sandi */}
-                <View style={[styles.settingRow, { borderBottomWidth: 0 }]}>
-                  <Text style={styles.label}>Ganti Kata Sandi</Text>
+                <View style={[ComponentStyles.settingsRow, { borderBottomWidth: 0 }]}>
+                  <Text style={ComponentTextStyles.settingsLabel}>Ganti Kata Sandi</Text>
                   <TouchableOpacity
-                    style={styles.changePassBtn}
+                    style={ComponentStyles.settingsChangePassBtn}
                     onPress={() => {
                       onClose();
                       setTimeout(onOpenChangePassword, 300);
                     }}
                   >
-                    <Text style={styles.changePassText}>Ganti</Text>
+                    <Text style={ComponentTextStyles.settingsChangePassText}>Ganti</Text>
                   </TouchableOpacity>
                 </View>
 
@@ -147,126 +146,3 @@ export default function SettingsModal({
     </Modal>
   );
 }
-
-const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.3)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  keyboardView: {
-    width: '100%',
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  pressableOverlay: {
-    width: '100%',
-    height: '100%',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  modalContainer: {
-    width: '100%',
-    maxWidth: 400,
-    maxHeight: '90%',
-    backgroundColor: '#F5F5F5',
-    borderRadius: 20,
-    overflow: 'hidden',
-    elevation: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 10,
-  },
-  header: {
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E0E0E0',
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontFamily: 'Montserrat-Bold',
-    color: Colors.black,
-  },
-  closeBtn: {
-    padding: 4,
-  },
-  scrollContent: {
-    paddingHorizontal: 20,
-    paddingBottom: 20,
-    paddingTop: 10,
-  },
-  settingRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E0E0E0',
-  },
-  label: {
-    fontSize: 14,
-    fontFamily: 'Montserrat-SemiBold',
-    color: Colors.black,
-    flex: 1,
-    marginRight: 10,
-  },
-  dropdownBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#E0E0E0',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 12,
-    minWidth: 110,
-    justifyContent: 'space-between',
-  },
-  dropdownText: {
-    fontSize: 14,
-    fontFamily: 'Montserrat-Medium',
-    color: Colors.black,
-    marginRight: 6,
-  },
-  input: {
-    backgroundColor: '#E0E0E0',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    fontSize: 14,
-    fontFamily: 'Montserrat-Regular',
-    color: Colors.black,
-    flex: 1.5,
-    maxWidth: 180,
-    textAlign: 'center',
-  },
-  actionBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 4,
-  },
-  actionText: {
-    fontSize: 14,
-    fontFamily: 'Montserrat-Bold',
-    color: Colors.black,
-  },
-  changePassBtn: {
-    backgroundColor: '#CCC',
-    borderRadius: 20,
-    paddingHorizontal: 24,
-    paddingVertical: 10,
-    minWidth: 80,
-    alignItems: 'center',
-  },
-  changePassText: {
-    fontSize: 14,
-    fontFamily: 'Montserrat-Bold',
-    color: '#D32F2F',
-  },
-});

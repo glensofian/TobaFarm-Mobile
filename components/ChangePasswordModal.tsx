@@ -7,13 +7,12 @@ import {
   Platform,
   Pressable,
   ScrollView,
-  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
-import { Colors } from '../styles';
+import { ComponentStyles, ComponentTextStyles } from '../styles';
 
 type ChangePasswordModalProps = {
   visible: boolean;
@@ -35,18 +34,18 @@ export default function ChangePasswordModal({
 
   const handleSave = async () => {
     if (!oldPassword || !newPassword || !confirmPassword) {
-      Alert.alert("Error", "Semua field harus diisi.");
+      Alert.alert("Input Tidak Lengkap", "Harap isi semua field password.");
       return;
     }
     if (newPassword !== confirmPassword) {
-      Alert.alert("Error", "Konfirmasi password baru tidak cocok.");
+      Alert.alert("Password Tidak Cocok", "Konfirmasi password baru tidak sesuai.");
       return;
     }
 
-    setLoading(true);
     try {
+      setLoading(true);
       await onSubmit(oldPassword, newPassword);
-      Alert.alert("Sukses", "Kata sandi berhasil diubah.");
+      Alert.alert("Berhasil", "Kata sandi Anda telah diperbarui.");
       onClose();
       setOldPassword('');
       setNewPassword('');
@@ -64,88 +63,91 @@ export default function ChangePasswordModal({
       transparent={true}
       visible={visible}
       onRequestClose={onClose}
+      statusBarTranslucent={true}
     >
-      <View style={styles.overlay}>
+      <View style={ComponentStyles.changePassOverlay}>
         <KeyboardAvoidingView
           behavior={Platform.OS === "ios" ? "padding" : "padding"}
-          style={styles.keyboardView}
+          style={ComponentStyles.changePassKeyboardView}
           keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : -100}
         >
-          <Pressable style={styles.pressableOverlay} onPress={onClose}>
-            <View style={styles.modalContainer} onStartShouldSetResponder={() => true}>
-              {/* Header */}
-              <View style={styles.header}>
-                <Text style={styles.headerTitle}>Ganti Kata Sandi</Text>
+          <Pressable style={ComponentStyles.changePassPressableOverlay} onPress={onClose}>
+            <View style={ComponentStyles.changePassContainer} onStartShouldSetResponder={() => true}>
+              <View style={ComponentStyles.changePassHeader}>
+                <Text style={ComponentTextStyles.changePassHeaderTitle}>Ganti Kata Sandi</Text>
               </View>
 
               <ScrollView
-                bounces={false}
-                showsVerticalScrollIndicator={false}
+                contentContainerStyle={ComponentStyles.changePassScrollContent}
                 keyboardShouldPersistTaps="handled"
-                contentContainerStyle={styles.scrollContent}
               >
-                {/* Password lama */}
-                <View style={styles.inputGroup}>
-                  <Text style={styles.label}>Kata Sandi Lama</Text>
-                  <View style={[styles.passwordWrapper, { backgroundColor: '#E2E2E2' }]}>
+                {/* Kata Sandi Lama */}
+                <View style={ComponentStyles.changePassField}>
+                  <Text style={ComponentTextStyles.changePassLabel}>Kata Sandi Lama</Text>
+                  <View style={ComponentStyles.changePassInputWrapper}>
                     <TextInput
-                      style={styles.input}
+                      style={ComponentStyles.changePassInput}
                       secureTextEntry={!showOld}
                       value={oldPassword}
                       onChangeText={setOldPassword}
                       placeholder="********"
-                      placeholderTextColor="#999"
+                      placeholderTextColor="#AAA"
                     />
-                    <TouchableOpacity onPress={() => setShowOld(!showOld)} style={styles.eyeIcon}>
+                    <TouchableOpacity onPress={() => setShowOld(!showOld)} style={ComponentStyles.changePassEyeBtn}>
                       <Ionicons name={showOld ? "eye-off-outline" : "eye-outline"} size={20} color="#666" />
                     </TouchableOpacity>
                   </View>
                 </View>
 
-                {/* Password Baru */}
-                <View style={styles.inputGroup}>
-                  <Text style={styles.label}>Kata Sandi Baru</Text>
-                  <View style={[styles.passwordWrapper, { backgroundColor: '#E2E2E2' }]}>
+                {/* Kata Sandi Baru */}
+                <View style={ComponentStyles.changePassField}>
+                  <Text style={ComponentTextStyles.changePassLabel}>Kata Sandi Baru</Text>
+                  <View style={ComponentStyles.changePassInputWrapper}>
                     <TextInput
-                      style={styles.input}
+                      style={ComponentStyles.changePassInput}
                       secureTextEntry={!showNew}
                       value={newPassword}
                       onChangeText={setNewPassword}
                       placeholder="********"
-                      placeholderTextColor="#999"
+                      placeholderTextColor="#AAA"
                     />
-                    <TouchableOpacity onPress={() => setShowNew(!showNew)} style={styles.eyeIcon}>
+                    <TouchableOpacity onPress={() => setShowNew(!showNew)} style={ComponentStyles.changePassEyeBtn}>
                       <Ionicons name={showNew ? "eye-off-outline" : "eye-outline"} size={20} color="#666" />
                     </TouchableOpacity>
                   </View>
                 </View>
 
-                {/* Konfirmasi */}
-                <View style={styles.inputGroup}>
-                  <Text style={styles.label}>Konfirmasi Kata Sandi Baru</Text>
-                  <View style={[styles.passwordWrapper, { backgroundColor: '#E2E2E2' }]}>
+                {/* Konfirmasi Kata Sandi Baru */}
+                <View style={ComponentStyles.changePassField}>
+                  <Text style={ComponentTextStyles.changePassLabel}>Konfirmasi Kata Sandi Baru</Text>
+                  <View style={ComponentStyles.changePassInputWrapper}>
                     <TextInput
-                      style={styles.input}
+                      style={ComponentStyles.changePassInput}
                       secureTextEntry={!showNew}
                       value={confirmPassword}
                       onChangeText={setConfirmPassword}
                       placeholder="********"
-                      placeholderTextColor="#999"
+                      placeholderTextColor="#AAA"
                     />
                   </View>
                 </View>
 
-                {/* Buttons */}
-                <View style={styles.footer}>
-                  <TouchableOpacity style={[styles.btn, styles.cancelBtn]} onPress={onClose}>
-                    <Text style={styles.cancelBtnText}>Batal</Text>
-                  </TouchableOpacity>
+                {/* Actions */}
+                <View style={ComponentStyles.changePassActions}>
                   <TouchableOpacity
-                    style={[styles.btn, styles.saveBtn, loading && { opacity: 0.6 }]}
+                    style={ComponentStyles.changePassBtnCancel}
+                    onPress={onClose}
+                    disabled={loading}
+                  >
+                    <Text style={ComponentTextStyles.changePassBtnCancelText}>Batal</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={ComponentStyles.changePassBtnSave}
                     onPress={handleSave}
                     disabled={loading}
                   >
-                    <Text style={styles.saveBtnText}>{loading ? "Menyimpan..." : "Simpan"}</Text>
+                    <Text style={ComponentTextStyles.changePassBtnSaveText}>{loading ? "Menyimpan..." : "Simpan"}</Text>
                   </TouchableOpacity>
                 </View>
                 <View style={{ height: 40 }} />
@@ -157,112 +159,3 @@ export default function ChangePasswordModal({
     </Modal>
   );
 }
-
-const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.3)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  keyboardView: {
-    width: '100%',
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  pressableOverlay: {
-    width: '100%',
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  modalContainer: {
-    width: '100%',
-    maxWidth: 400,
-    maxHeight: '80%',
-    backgroundColor: '#F5F5F5',
-    borderRadius: 20,
-    overflow: 'hidden',
-    elevation: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 10,
-    flexShrink: 1,
-  },
-  header: {
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E0E0E0',
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontFamily: 'Montserrat-Bold',
-    color: Colors.black,
-  },
-  scrollContent: {
-    paddingHorizontal: 20,
-    paddingTop: 10,
-    paddingBottom: 20,
-  },
-  inputGroup: {
-    marginBottom: 12,
-  },
-  label: {
-    fontSize: 13,
-    fontFamily: 'Montserrat-SemiBold',
-    color: '#333',
-    marginBottom: 6,
-  },
-  passwordWrapper: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderRadius: 12,
-    paddingHorizontal: 12,
-  },
-  input: {
-    flex: 1,
-    paddingVertical: 10,
-    fontSize: 14,
-    fontFamily: 'Montserrat-Regular',
-    color: Colors.black,
-  },
-  eyeIcon: {
-    padding: 8,
-  },
-  footer: {
-    flexDirection: 'row',
-    marginTop: 15,
-    justifyContent: 'flex-end',
-  },
-  btn: {
-    paddingVertical: 10,
-    paddingHorizontal: 24,
-    borderRadius: 12,
-    minWidth: 90,
-    alignItems: 'center',
-  },
-  cancelBtn: {
-    marginRight: 10,
-    backgroundColor: '#EEE',
-  },
-  cancelBtnText: {
-    fontFamily: 'Montserrat-Bold',
-    fontSize: 14,
-    color: '#333',
-  },
-  saveBtn: {
-    backgroundColor: Colors.backgroundPrimary,
-  },
-  saveBtnText: {
-    fontFamily: 'Montserrat-Bold',
-    fontSize: 14,
-    color: Colors.white,
-  },
-});
