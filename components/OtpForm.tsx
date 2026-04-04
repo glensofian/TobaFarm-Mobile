@@ -1,5 +1,5 @@
 import { OTPCreate, OTPInput } from "@/types/otp";
-import axios from "axios";
+import { sendOtp, verifyOtpCode, verifyRegistration } from "../api/authApi";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import {
@@ -43,26 +43,14 @@ export default function OtpForm() {
     setIsInitializing(true);
 
     try {
-      const payload: OTPCreate = {
+      await sendOtp({
         email,
         user_id: user_id || null,
         lang: "id",
-      };
-
-      console.log(payload);
-
-      const response = await axios.post(
-        `${process.env.EXPO_PUBLIC_TOFA_API_URL}/otp`,
-        payload,
-      );
-
-      if (response.status === 200) {
-        setInfo(`OTP Berhasil Dikirim ke ${email}`);
-      } else {
-        setError("Gagal mengirim OTP. Silakan coba lagi.");
-      }
-    } catch (error) {
-      setError("Gagal mengirim OTP. Coba lagi.");
+      });
+      setInfo(`OTP Berhasil Dikirim ke ${email}`);
+    } catch (err: any) {
+      setError(err.message || "Gagal mengirim OTP.");
     } finally {
       setIsInitializing(false);
     }
@@ -96,35 +84,16 @@ export default function OtpForm() {
 
     try {
       setLoading(true);
-      const payload: OTPInput = { email, otp: code };
-
-      const response = await axios.post(
-        `${process.env.EXPO_PUBLIC_TOFA_API_URL}/otp/verify`,
-        payload,
-      );
-
-      if (response.status !== 200) {
-        setError("Gagal verifikasi OTP. Silakan coba lagi.");
-        return;
-      }
-
-      const verifyRegistrationResponse = await axios.post(
-        `${process.env.EXPO_PUBLIC_TOFA_API_URL}/auth/verify`,
-        payload,
-      );
-
-      if (verifyRegistrationResponse.status !== 200) {
-        setError("Gagal verifikasi OTP. Silakan coba lagi.");
-        return;
-      }
+      await verifyOtpCode({ email, otp: code });
+      await verifyRegistration({ email, otp: code });
 
       setInfo("Kode OTP berhasil diverifikasi.");
       
       await new Promise((r) => setTimeout(r, 600));
       router.replace("/login");
       
-    } catch {
-      setError("Kode OTP tidak valid atau sudah kadaluarsa.");
+    } catch (err: any) {
+      setError(err.message || "Kode OTP tidak valid atau sudah kadaluarsa.");
     } finally {
       setLoading(false);
     }

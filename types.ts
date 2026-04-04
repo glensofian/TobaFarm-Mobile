@@ -2,6 +2,7 @@ export type Lang = "id" | "en";
 
 export type UserProfile = {
   username: string;
+  nickname?: string;
   // tambah field lain kalau ada
 };
 

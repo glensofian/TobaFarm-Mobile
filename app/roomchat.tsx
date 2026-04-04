@@ -18,6 +18,8 @@ import ChatList from '../components/ChatList';
 import Sidebar from '../components/Sidebar';
 import DownloadModel from '../components/DownloadModel';
 import NotificationModal from '../components/NotificationModal';
+import SettingsModal from '../components/SettingsModal';
+import ChangePasswordModal from '../components/ChangePasswordModal';
 import { ChatProvider, useChat } from '../context/ChatContext';
 import { Colors, Layout, ComponentStyles, ComponentTextStyles } from '../styles';
 import { translations } from '../constants/i18n/translations';
@@ -32,6 +34,10 @@ function RoomChatInner() {
   // --- State Keyboard visibility ---
   const [isKeyboardVisible, setKeyboardVisible] = useState(false);
   const t = translations['id'];
+
+  // --- Modal States ---
+  const [settingsVisible, setSettingsVisible] = useState(false);
+  const [changePasswordVisible, setChangePasswordVisible] = useState(false);
   
   useEffect(() => {
     const showEvent = Platform.OS === 'android' ? 'keyboardDidShow' : 'keyboardWillShow';
@@ -67,6 +73,9 @@ function RoomChatInner() {
     handleDeleteConversation,
     handleRenameConversation,
     handleClearAllChats,
+    handleLogout,
+    handleUpdateNickname,
+    handleChangePassword,
     isSyncing,
     wsStatus,
   } = useChat();
@@ -200,7 +209,7 @@ function RoomChatInner() {
           <TouchableOpacity onPress={handleNewChat}>
             <Ionicons name="create-outline" size={22} color={Colors.white} />
           </TouchableOpacity>
-          <TouchableOpacity onPress={() => Alert.alert("Settings", "Fitur ini akan segera hadir.")}>
+          <TouchableOpacity onPress={() => setSettingsVisible(true)}>
             <Ionicons name="settings-outline" size={22} color={Colors.white} />
           </TouchableOpacity>
           {selectedModel === 'tofa-offline' && (
@@ -249,8 +258,8 @@ function RoomChatInner() {
               <ChatInput
                 model={selectedModel}
                 isLoading={isSending}
-                placeholder={isSending ? `ToFa Sedang Menjawab${typingDots}` : "Tanyakan sesuatu..."}
                 onSend={(text) => onSend(undefined, text)}
+                placeholder={isSending ? `ToFa Sedang Menjawab${typingDots}` : "Tanyakan sesuatu..."}
               />
             </View>
           </>
@@ -285,10 +294,26 @@ function RoomChatInner() {
         filteredConversations={filteredConversations}
         openMenuId={openMenuId}
         setOpenMenuId={(fn: any) => setOpenMenuId(fn)}
-        onOpenSettings={() => {}}
+        onOpenSettings={() => setSettingsVisible(true)}
       />
 
-      {/* ===== MODALS ===== */}
+      {/* ===== MODALS (PROPS BASED) ===== */}
+      <SettingsModal 
+        visible={settingsVisible}
+        onClose={() => setSettingsVisible(false)}
+        onLogout={handleLogout}
+        onClearAll={handleClearAllChats}
+        onOpenChangePassword={() => setChangePasswordVisible(true)}
+        username={user?.username || ""}
+        onSaveNickname={handleUpdateNickname}
+      />
+
+      <ChangePasswordModal 
+        visible={changePasswordVisible}
+        onClose={() => setChangePasswordVisible(false)}
+        onSubmit={handleChangePassword}
+      />
+
       <NotificationModal
         visible={!!notification}
         title={notification?.title}

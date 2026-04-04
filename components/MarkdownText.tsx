@@ -2,10 +2,6 @@ import React from 'react';
 import { Text, View, StyleSheet } from 'react-native';
 
 /* ============================================================
-   MarkdownText — renders a subset of Markdown in React Native.
-   Semua font mengacu pada Montserrat yang sudah dikonfigurasi
-   di project (Montserrat-Regular, Medium, SemiBold, Bold, Italic).
-
    Supported:
      **bold**        → Montserrat-Bold
      *italic*        → Montserrat-Italic
@@ -21,13 +17,11 @@ import { Text, View, StyleSheet } from 'react-native';
 
 interface Props {
   text: string;
-  /** Base font size (default 13, sama seperti chatBubbleText) */
   fontSize?: number;
-  /** Base text color */
   color?: string;
 }
 
-// ---- Inline span types ---------------------------------------
+// --- Inline span types ---
 type Span =
   | { kind: 'text'; value: string }
   | { kind: 'bold'; value: string }
@@ -37,7 +31,6 @@ type Span =
 
 function parseInline(raw: string): Span[] {
   const spans: Span[] = [];
-  // Order matters: bold-italic (***) first, then bold (**), italic (*), code (`)
   const pattern = /(\*\*\*(.+?)\*\*\*|\*\*(.+?)\*\*|\*(.+?)\*|`(.+?)`)/gs;
   let lastIndex = 0;
   let match: RegExpExecArray | null;
@@ -65,7 +58,7 @@ function parseInline(raw: string): Span[] {
   return spans;
 }
 
-// ---- Renders a single line with inline formatting ------------
+// ---- Renders a single line with inline formatting ----
 function InlineText({
   raw,
   baseFontSize,
@@ -135,7 +128,7 @@ function InlineText({
   );
 }
 
-// ---- Block types ---------------------------------------------
+// ---- Block types ----
 type Block =
   | { kind: 'paragraph'; raw: string }
   | { kind: 'h1'; raw: string }
@@ -154,7 +147,6 @@ function parseBlocks(text: string): Block[] {
   let inCode = false;
 
   for (const line of lines) {
-    // Fenced code block fence
     if (line.trim().startsWith('```')) {
       if (inCode) {
         blocks.push({ kind: 'code-block', raw: codeBuffer.join('\n') });
@@ -187,7 +179,6 @@ function parseBlocks(text: string): Block[] {
     blocks.push({ kind: 'paragraph', raw: line });
   }
 
-  // Flush unfinished code block
   if (inCode && codeBuffer.length > 0) {
     blocks.push({ kind: 'code-block', raw: codeBuffer.join('\n') });
   }
@@ -195,7 +186,7 @@ function parseBlocks(text: string): Block[] {
   return blocks;
 }
 
-// ---- Main Component ------------------------------------------
+// ---- Main Component ----
 export default function MarkdownText({ text, fontSize = 13, color = '#E6ECF2' }: Props) {
   const blocks = parseBlocks(text);
 
@@ -302,7 +293,7 @@ export default function MarkdownText({ text, fontSize = 13, color = '#E6ECF2' }:
   );
 }
 
-// ---- Styles --------------------------------------------------
+// ---- Styles ----
 const styles = StyleSheet.create({
   h1: {
     fontFamily: 'Montserrat-Bold',

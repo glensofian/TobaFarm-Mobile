@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import axios from "axios";
+import { login } from "../api/authApi";
 import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import {
@@ -47,60 +47,17 @@ export default function LoginForm() {
     try {
       setLoading(true);
 
-      const payload = new URLSearchParams({
-        username: em,
-        password: pw,
-      });
-      console.log("Answer:");
-      console.log(process.env.EXPO_PUBLIC_TOFA_API_URL);
-      const response = await axios.post(
-        `${process.env.EXPO_PUBLIC_TOFA_API_URL}/auth/token`,
-        payload.toString(),
-        {
-          headers: {
-            "Content-Type": "application/x-www-form-urlencoded",
-          },
-        },
-      );
+      const responseData = await login({ username: em, password: pw });
 
-      console.log("Response Status:");
-      console.log(response.status);
+      await save("token", responseData.access_token);
+      await save("user", JSON.stringify(responseData.user));
 
-      if (response.status !== 200) {
-        setError("Login gagal. Silakan coba lagi.");
-        return;
-      }
+      console.log("Routing to roomchat");
+      await new Promise((r) => setTimeout(r, 500));
 
-      console.log("Response data:");
-      console.log(response.data);
-
-      if (response.status === 200) {
-        await save("token", response.data.access_token);
-        await save("user", JSON.stringify(response.data.user));
-
-        console.log("Routing to roomchat");
-        await new Promise((r) => setTimeout(r, 500));
-
-        router.replace("/roomchat");
-      }
+      router.replace("/roomchat");
     } catch (err: any) {
-      if (err.response) {
-        const detail = err.response.data?.detail;
-        const status = err.response.status;
-
-        // Sinkronisasi Error
-        if (status === 404 && detail === "Email not registered") {
-          setError("Email tidak terdaftar.");
-        } else if (status === 401 && detail === "Incorrect password") {
-          setError("Kata sandi salah.");
-        } else if (status === 403 && detail === "Account not verified") {
-          setError("Akun belum diverifikasi. Silakan cek email/OTP.");
-        } else {
-          setError(detail || "Login gagal. Silakan coba lagi.");
-        }
-      } else {
-        setError("Tidak dapat terhubung ke server. Pastikan koneksi aktif.");
-      }
+      setError(err.message || "Login gagal. Silakan coba lagi.");
     } finally {
       setLoading(false);
     }

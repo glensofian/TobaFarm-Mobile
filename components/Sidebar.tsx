@@ -353,37 +353,16 @@ export default function Sidebar({
                   {user?.username || "User"}
                 </Text>
 
-                {/* ARROW */}
+                {/* SETTINGS ICON */}
                 <Ionicons
                   name="settings-outline"
                   size={16}
                   color={Colors.black}
-                  onPress={() => showSettingsModal(!settingsModal)}
+                  onPress={() => {
+                    onClose();
+                    setTimeout(onOpenSettings, 300);
+                  }}
                 />
-
-                {settingsModal && (
-                  <View style={{
-                    position: 'absolute',
-                    bottom: 45,
-                    right: 15,
-                    backgroundColor: 'white',
-                    borderRadius: 8,
-                    paddingVertical: 10,
-                    paddingHorizontal: 16,
-                    elevation: 5,
-                    shadowColor: '#000',
-                    shadowOffset: { width: 0, height: 2 },
-                    shadowOpacity: 0.25,
-                    shadowRadius: 3.84,
-                    zIndex: 1000,
-                  }}>
-                    <TouchableOpacity onPress={() => { showSettingsModal(false) }}>
-                      <Text style={{ fontFamily: 'Montserrat-Medium', fontSize: 13, color: '#D32F2F' }} onPress={handleLogout}>
-                        Logout
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
-                )}
               </View>
             </View>
           </Pressable>

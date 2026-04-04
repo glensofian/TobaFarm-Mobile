@@ -1,7 +1,7 @@
 import { OTPCreate } from "@/types/otp";
 import { RegisterUser } from "@/types/user";
 import { Ionicons } from "@expo/vector-icons";
-import axios from "axios";
+import { register } from "../api/authApi";
 import { useRouter } from "expo-router";
 import { useState } from "react";
 import {
@@ -77,39 +77,27 @@ export default function RegisterForm() {
     try {
       setLoading(true);
 
-      const payload: RegisterUser = {
+      const responseData = await register({
         username: un,
         email: em,
         password: pw,
         role: "user",
+      });
+
+      const otpParams: OTPCreate = {
+        email: em,
+        user_id: responseData.id,
+        lang: "id",
       };
 
-      const response = await axios.post(
-        `${process.env.EXPO_PUBLIC_TOFA_API_URL}/auth/register`,
-        payload
-      );
+      await new Promise((r) => setTimeout(r, 600));
 
-      if (response.status === 200 || response.status === 201) {
-        const otpParams: OTPCreate = {
-          email: em,
-          user_id: response.data.id,
-          lang: "id",
-        };
-
-
-        await new Promise((r) => setTimeout(r, 600));
-
-        router.replace({
-          pathname: "/otp",
-          params: otpParams as any,
-        });
-      }
+      router.replace({
+        pathname: "/otp",
+        params: otpParams as any,
+      });
     } catch (err: any) {
-      if (err.response) {
-        setError(err.response.data?.detail || "Registrasi gagal.");
-      } else {
-        setError("Koneksi gagal. Periksa jaringan Anda.");
-      }
+      setError(err.message || "Registrasi gagal.");
     } finally {
       setLoading(false);
     }
@@ -182,7 +170,6 @@ export default function RegisterForm() {
             placeholder="Ulangi password"
             editable={!loading}
           />
-          {/* Tombol eye ini juga mengontrol keduanya */}
           <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
 
             <Ionicons

@@ -3,6 +3,8 @@
  * Menangani pengelolaan percakapan, pesan, RAG (Offline), WebSocket, dan Sinkronisasi.
  */
 
+import * as FileSystem from 'expo-file-system/legacy';
+import { useRouter } from 'expo-router';
 import React, {
   createContext,
   useCallback,
@@ -12,34 +14,31 @@ import React, {
   useRef,
   useState,
 } from 'react';
-import { Alert, Keyboard, Platform } from 'react-native';
-import { useRouter } from 'expo-router';
-import * as FileSystem from 'expo-file-system/legacy';
+import { Alert, Keyboard } from 'react-native';
 
-import { useNetwork } from './NetworkContext';
-import { useNetworkStatus } from '../hooks/useNetworkStatus';
-import { useWebSocketChat } from '../hooks/useWebSocketChat';
 import { useSyncChat } from '../hooks/useSyncChat';
+import { useWebSocketChat } from '../hooks/useWebSocketChat';
+import { useNetwork } from './NetworkContext';
 
+import { changePassword, updateNickname } from '@/api/authApi';
 import { createConversationsApi } from '@/api/conversationsApi';
-import { ChatRepository } from '../data/repositories/ChatRepository';
+import { nowIso } from '@/utils/date';
+import { getValueFor, removeValueFor, save } from '@/utils/storage';
+import { uid } from '@/utils/uid';
 import { MODEL_CONFIG } from '../constants/modelConfig';
 import { models } from '../constants/models';
-import { getValueFor, removeValueFor, save } from '@/utils/storage';
-import { nowIso } from '@/utils/date';
-import { uid } from '@/utils/uid';
-import { truncateTitle } from '@/utils/truncateTitle';
+import { ChatRepository } from '../data/repositories/ChatRepository';
 import { loadKnowledgeBase } from '../utils/knowledgeLoader';
 import { LlamaRNWrapper } from '../utils/LlamaRNWrapper';
 
-import { MemoryVectorStore } from 'react-native-rag';
 import { ExecuTorchEmbeddings } from '@react-native-rag/executorch';
 import { ALL_MINILM_L6_V2 } from 'react-native-executorch';
+import { MemoryVectorStore } from 'react-native-rag';
 
-import type { 
-  Conversation as GlobalConversation, 
-  Message as GlobalMessage, 
-  UserProfile 
+import type {
+  Conversation as GlobalConversation,
+  Message as GlobalMessage,
+  UserProfile
 } from '../types';
 
 import type {
@@ -54,7 +53,7 @@ export type ChatNotification = { title: string; message: string } | null;
 export type ChatContextValue = {
   /* User Profile */
   user: UserProfile | null;
-  
+
   /* Sidebar & UI */
   sidebarOpen: boolean;
   setSidebarOpen: (v: boolean) => void;
@@ -62,7 +61,7 @@ export type ChatContextValue = {
   setSearchOpen: (v: boolean | ((prev: boolean) => boolean)) => void;
   searchQuery: string;
   setSearchQuery: (v: string) => void;
-  
+
   /* Model selection */
   selectedModel: string;
   setSelectedModel: (m: string) => void;
@@ -81,7 +80,7 @@ export type ChatContextValue = {
   filteredConversations: GlobalConversation[];
   isDataLoaded: boolean;
   setIsDataLoaded: (v: boolean) => void;
-  
+
   /* Messages */
   messagesByConversation: Record<string, GlobalMessage[]>;
   activeMessagesUI: { id: string; type: string; text: string }[];
@@ -112,6 +111,9 @@ export type ChatContextValue = {
   handleLoadMessages: (conversationId: string) => Promise<void>;
   handleStop: () => void;
   handleClearAllChats: () => Promise<void>;
+  handleChangePassword: (oldPw: string, newPw: string) => Promise<void>;
+  handleUpdateNickname: (newNickname: string) => Promise<void>;
+  handleLogout: () => Promise<void>;
 
   /* Sync & Status */
   isSyncing: boolean;
@@ -149,7 +151,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
 
   /* --- User Profile --- */
   const [user, setUser] = useState<UserProfile | null>(null);
-  
+
   useEffect(() => {
     async function loadUser() {
       const u = await getValueFor("user");
@@ -233,7 +235,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
   }, [activeConversationId]);
 
   const [messagesByConversation, setMessagesByConversation] = useState<Record<string, GlobalMessage[]>>({});
-  
+
   // Ref untuk melacak state pesan terbaru
   const messagesRef = useRef<Record<string, GlobalMessage[]>>({});
   useEffect(() => {
@@ -342,14 +344,14 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
         const local = await ChatRepository.getAllConversations();
         combined = local.map(dbToGlobalConversation);
       }
-      
+
       setConversations(prev => {
         const tempConvs = prev.filter(c => c.id.startsWith("temp-"));
         const merged = [...tempConvs];
         combined.forEach(ext => {
-           if (!merged.find(m => m.id === ext.id)) {
-              merged.push(ext);
-           }
+          if (!merged.find(m => m.id === ext.id)) {
+            merged.push(ext);
+          }
         });
         return merged;
       });
@@ -360,9 +362,9 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
         const localMapped = local.map(dbToGlobalConversation);
         const merged = [...tempConvs];
         localMapped.forEach(ext => {
-           if (!merged.find(m => m.id === ext.id)) {
-              merged.push(ext);
-           }
+          if (!merged.find(m => m.id === ext.id)) {
+            merged.push(ext);
+          }
         });
         return merged;
       });
@@ -373,7 +375,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
 
   const handleLoadMessages = useCallback(async (cid: string) => {
     if (!cid) return;
-    
+
     const existing = messagesRef.current[cid];
     if (existing && existing.length > 0) {
       console.log("[ChatContext] Skip handleLoadMessages (data exists locally):", cid);
@@ -515,12 +517,12 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
 
     let threadId = forceNewChat ? "" : activeConversationId;
     const isNewChat = !threadId;
-    
-    let generatedTitle = text.trim().split("\n")[0]; 
+
+    let generatedTitle = text.trim().split("\n")[0];
     if (generatedTitle.length > 120) {
       generatedTitle = generatedTitle.slice(0, 117) + "...";
     }
-    
+
     const isOffline = selectedModel === 'tofa-offline';
 
     if (isNewChat) {
@@ -579,13 +581,13 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
         const data = await api.createConversation();
         if (data?.id) {
           const realId = data.id;
-          const oldTempId = threadId; 
-          tempIdMapRef.current[oldTempId] = realId; 
+          const oldTempId = threadId;
+          tempIdMapRef.current[oldTempId] = realId;
 
           setConversations((prev) =>
-            prev.map((c) => 
-              (c.id === oldTempId || c.id === realId) 
-                ? { ...c, id: realId, title: generatedTitle } 
+            prev.map((c) =>
+              (c.id === oldTempId || c.id === realId)
+                ? { ...c, id: realId, title: generatedTitle }
                 : c
             )
           );
@@ -600,20 +602,20 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
           api.renameConversation(realId, generatedTitle).catch(err => {
             console.warn("[ChatContext] Failed renaming on server:", err);
           });
-          api.saveMessage(realId, "user", text).catch(() => {});
+          api.saveMessage(realId, "user", text).catch(() => { });
         }
       } catch (e) {
         console.error("Failed to create real conversation:", e);
       }
     } else if (!isNewChat && !isOffline) {
-      api.saveMessage(threadId, "user", text).catch(() => {});
-      
+      api.saveMessage(threadId, "user", text).catch(() => { });
+
       setConversations((prev) => {
         const targetIdx = prev.findIndex(c => c.id === threadId);
         if (targetIdx !== -1) {
           const target = prev[targetIdx];
           if (target.title === "Percakapan Baru" || target.title === "Untitled" || !target.title) {
-            api.renameConversation(threadId, generatedTitle).catch(() => {});
+            api.renameConversation(threadId, generatedTitle).catch(() => { });
             const updated = [...prev];
             updated[targetIdx] = { ...target, title: generatedTitle };
             return updated;
@@ -644,7 +646,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
 
       setConversations((prev) => {
         const next = prev.filter(c => c.id !== id);
-        
+
         if (activeConversationId === id) {
           if (next.length === 0) {
             setTimeout(() => router.replace("/"), 300);
@@ -691,18 +693,39 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
       }
       await ChatRepository.deleteSyncedConversations();
       await ChatRepository.deleteSyncedMessages();
-      
+
       setConversations([]);
       setMessagesByConversation({});
       setActiveConversationId("");
       removeValueFor("lastConversationId");
-      setSidebarOpen(false); 
-      
+      setSidebarOpen(false);
+
       setTimeout(() => router.replace("/"), 300);
     } catch (e) {
       Alert.alert("Gagal Menghapus", "Terjadi kesalahan saat menghapus semua percakapan.");
     }
   }, [api, isInternetReachable, router]);
+
+  const handleChangePassword = useCallback(async (oldPw: string, newPw: string) => {
+    await changePassword(oldPw, newPw);
+  }, []);
+
+  const handleUpdateNickname = useCallback(async (newNickname: string) => {
+    await updateNickname(newNickname);
+    if (user) {
+      const newUser = { ...user, nickname: newNickname };
+      setUser(newUser);
+      save("user", JSON.stringify(newUser));
+      setNotification({ title: 'Sukses', message: 'Nama panggilan berhasil diperbarui.' });
+    }
+  }, [user]);
+
+  const handleLogout = useCallback(async () => {
+    setSidebarOpen(false);
+    await removeValueFor("token");
+    await removeValueFor("user");
+    router.replace("/");
+  }, [router]);
 
   const filteredConversations = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
@@ -756,6 +779,9 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
         handleLoadMessages,
         handleStop,
         handleClearAllChats,
+        handleChangePassword,
+        handleUpdateNickname,
+        handleLogout,
         isSyncing,
         wsStatus: ws.status,
       }}
