@@ -1,192 +1,70 @@
-import { useLocalSearchParams, useRouter } from "expo-router";
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { Alert, KeyboardAvoidingView, Platform, Text, TouchableOpacity, View, Keyboard } from "react-native";
-import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
-import { Ionicons } from "@expo/vector-icons";
-import ChatInput from "../components/ChatInput";
-import ChatList from "../components/ChatList";
-import DownloadModel from "@/components/DownloadModel";
-import NotificationModal from "../components/NotificationModal";
-import { useWebSocketChat } from "../hooks/useWebSocketChat";
-import { useNetwork } from "@/context/NetworkContext";
-import { useNetworkStatus } from "@/hooks/useNetworkStatus";
-import * as FileSystem from "expo-file-system/legacy";
-import { Message } from "../types";
-import { nowIso } from "@/utils/date";
-import { uid } from "@/utils/uid";
-import { MODEL_CONFIG } from "../constants/modelConfig";
-import { models } from "../constants/models";
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useEffect, useState } from 'react';
+import {
+  KeyboardAvoidingView,
+  Platform,
+  Text,
+  TouchableOpacity,
+  View,
+  Keyboard,
+} from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
+import ChatInput from '../components/ChatInput';
+import ChatList from '../components/ChatList';
+import DownloadModel from '../components/DownloadModel';
+import NotificationModal from '../components/NotificationModal';
+import { GuestProvider, useGuest } from '../context/GuestContext';
 import {
   Colors,
   Layout,
   ComponentStyles,
   ComponentTextStyles,
-} from "../styles";
+} from '../styles';
 
-const makeUserMsg = (text: string): Message => ({
-  id: uid("m"),
-  role: "user",
-  text,
-  createdAt: nowIso(),
-});
+// --- Inner component { Context } ---
 
-export default function RoomGuest() {
-  const { prompt } = useLocalSearchParams<{ prompt?: string }>();
+function RoomGuestInner() {
   const router = useRouter();
+  const { prompt } = useLocalSearchParams<{ prompt?: string }>();
+  const insets = useSafeAreaInsets();
 
-  const defaultOnlineModel = useMemo(
-    () => models.find((m) => m.type === "online")?.id || models[0].id,
-    [],
-  );
-
-  const [selectedModel, setSelectedModel] =
-    useState<string>(defaultOnlineModel);
-  const [downloadModelVisible, setDownloadModelVisible] = useState(false);
-  const [isOfflineModelDownloaded, setIsOfflineModelDownloaded] =
-    useState(false);
-
-  // --- State Dropdown ---
-  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-
-  // --- Keyboard State ---
+  // --- State Keyboard visibility ---
   const [isKeyboardVisible, setKeyboardVisible] = useState(false);
 
   useEffect(() => {
     const showEvent = Platform.OS === 'android' ? 'keyboardDidShow' : 'keyboardWillShow';
     const hideEvent = Platform.OS === 'android' ? 'keyboardDidHide' : 'keyboardWillHide';
-
-    const showListener = Keyboard.addListener(showEvent, () => setKeyboardVisible(true));
-    const hideListener = Keyboard.addListener(hideEvent, () => setKeyboardVisible(false));
-
+    const show = Keyboard.addListener(showEvent, () => setKeyboardVisible(true));
+    const hide = Keyboard.addListener(hideEvent, () => setKeyboardVisible(false));
     return () => {
-      showListener.remove();
-      hideListener.remove();
+      show.remove();
+      hide.remove();
     };
   }, []);
 
-  // --- State Network ---
-  const { isInternetReachable } = useNetwork();
   const {
-    isConnected: isNetworkConnected,
-    justDisconnected,
-    justConnected,
-  } = useNetworkStatus();
-  const [isModalDismissed, setIsModalDismissed] = useState(false);
-
-  // --- State Message Guest ---
-  const [input, setInput] = useState("");
-  const [isSending, setIsSending] = useState(false);
-  const [guestMessages, setGuestMessages] = useState<Message[]>([]);
-  const guestConversationId = useMemo(() => "guest-session-" + uid("g"), []);
-
-  // --- State Animation Typing ---
-  const [typingDots, setTypingDots] = useState("");
-
-  useEffect(() => {
-    let interval: NodeJS.Timeout;
-    if (isSending) {
-      interval = setInterval(() => {
-        setTypingDots((prev) => (prev.length < 3 ? prev + "." : ""));
-      }, 400);
-    } else {
-      setTypingDots("");
-    }
-    return () => clearInterval(interval);
-  }, [isSending]);
-
-  // --- Check Model Offline ---
-  const checkOfflineModel = useCallback(async () => {
-    try {
-      const info = await FileSystem.getInfoAsync(
-        MODEL_CONFIG.getLocalModelPath(),
-      );
-      setIsOfflineModelDownloaded(info.exists);
-    } catch (err) {
-      console.error("Error checking offline model:", err);
-      setIsOfflineModelDownloaded(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    checkOfflineModel();
-  }, [checkOfflineModel]);
-
-  // --- Handle Initial Prompt ---
-  const [notification, setNotification] = useState<{title: string, message: string} | null>(null);
-
-  // --- Automatic Model Change ---
-  useEffect(() => {
-    if (isInternetReachable === false && selectedModel !== "tofa-offline") {
-      if (isOfflineModelDownloaded) {
-        setSelectedModel("tofa-offline");
-        setNotification({
-          title: "Offline Mode",
-          message: "Koneksi terputus. Beralih ke mode offline otomatis."
-        });
-      } else {
-        setNotification({
-          title: "Mode Offline Tidak Tersedia",
-          message: "Koneksi terputus. Silakan hubungkan internet untuk mengunduh model terlebih dahulu."
-        });
-      }
-    } else if (
-      isInternetReachable === true &&
-      selectedModel === "tofa-offline"
-    ) {
-      setSelectedModel(defaultOnlineModel);
-      setNotification({
-        title: "Online Mode",
-        message: "Koneksi pulih. AI kembali menggunakan cloud."
-      });
-    }
-  }, [
-    isInternetReachable,
     selectedModel,
+    setSelectedModel,
     defaultOnlineModel,
     isOfflineModelDownloaded,
-  ]);
+    checkOfflineModel,
+    downloadModelVisible,
+    setDownloadModelVisible,
+    isDropdownOpen,
+    setIsDropdownOpen,
+    guestMessages,
+    isSending,
+    typingDots,
+    notification,
+    setNotification,
+    onSend,
+    wsStatus,
+  } = useGuest();
 
+  // Handle initial prompt from home screen
   useEffect(() => {
-    if (justDisconnected && selectedModel === "tofa-offline" && isOfflineModelDownloaded) {
-      setNotification({
-        title: "Offline Mode",
-        message: "Koneksi terputus. Beralih ke mode offline otomatis."
-      });
-    }
-  }, [justDisconnected]);
-
-  // --- WebSocket Handlers ---
-  const onWsToken = useCallback((cid: string, token: string) => {
-    setGuestMessages((prev) => {
-      const lastMsg = prev[prev.length - 1];
-      if (lastMsg && lastMsg.role === "bot") {
-        return [
-          ...prev.slice(0, -1),
-          { ...lastMsg, text: lastMsg.text + token },
-        ];
-      }
-      return [
-        ...prev,
-        { id: uid("m"), role: "bot", text: token, createdAt: nowIso() },
-      ];
-    });
-  }, []);
-
-  const onWsDone = useCallback(async (cid: string, fullText: string) => {
-    setIsSending(false);
-  }, []);
-
-  const ws = useWebSocketChat({
-    model: selectedModel,
-    enabled: true,
-    getActiveConversationId: () => guestConversationId,
-    onToken: onWsToken,
-    onDone: onWsDone,
-  });
-
-  // --- Handle Initial Prompt ---
-  useEffect(() => {
-    const isReady = ws.status === "open" || selectedModel === "tofa-offline";
+    const isReady = wsStatus === 'open' || selectedModel === 'tofa-offline';
     if (prompt && guestMessages.length === 0 && isReady && !isSending) {
       const timer = setTimeout(() => {
         onSend(undefined, prompt as string);
@@ -194,231 +72,174 @@ export default function RoomGuest() {
       }, 200);
       return () => clearTimeout(timer);
     }
-  }, [prompt, ws.status, selectedModel, guestMessages.length, isSending]);
+  }, [prompt, wsStatus, selectedModel, guestMessages.length, isSending]);
 
-  // --- Initial Prompt ---
-  const onSend = async (e?: React.FormEvent, overrideText?: string) => {
-    if (e) e.preventDefault();
-    const text = (overrideText ?? input).trim();
-
-    if (!text || isSending) return;
-
-    if (selectedModel === "tofa-offline" && !isOfflineModelDownloaded) {
-      Alert.alert(
-        "Model Offline Belum Tersedia",
-        "Silakan hubungkan internet untuk mengunduh model terlebih dahulu.",
-        [{ text: "OK" }],
-      );
-      return;
-    }
-
-    setIsSending(true);
-    Keyboard.dismiss();
-
-    const userMsg = makeUserMsg(text);
-    setGuestMessages((prev) => [...prev, userMsg]);
-    setInput("");
-
-    const wsOk = await ws.send(text, guestConversationId);
-    if (!wsOk) {
-      setNotification({
-        title: "Koneksi Bermasalah",
-        message: "Gagal mengirim pesan. Pastikan koneksi atau model sudah siap."
-      });
-      setIsSending(false);
-    }
-  };
-
-  // --- Mapper UI List Chat ---
-  const insets = useSafeAreaInsets();
+  // Map messages for ChatList
   const activeMessagesUI = guestMessages.map((m) => ({
     id: m.id,
-    type: m.role === "bot" || (m as any).role === "assistant" ? "ai" : "user",
+    type: m.role === 'bot' || (m as any).role === 'assistant' ? 'ai' : 'user',
     text: m.text,
   }));
 
   return (
     <SafeAreaView
-      edges={["top"]}
-      style={[
-        { flex: 1, backgroundColor: Colors.backgroundPrimary },
-      ]}
+      edges={['top']}
+      style={{ flex: 1, backgroundColor: Colors.backgroundPrimary }}
     >
-      {/* ===== HEADER GUEST ===== */}
-      <View
-        style={[ComponentStyles.roomChatHeader, { height: 60, zIndex: 20 }]}
-      >
-        <View style={{ flex: 1, justifyContent: "center" }}>
+      {/* ===== HEADER ===== */}
+      <View style={[ComponentStyles.roomChatHeader, { height: 60, zIndex: 20 }]}>
+        {/* Title */}
+        <View style={{ flex: 1, justifyContent: 'center' }}>
           <Text
             style={[
               ComponentTextStyles.roomChatHeaderTitle,
-              { fontSize: 20, fontFamily: "Montserrat-Bold" },
+              { fontSize: 20, fontFamily: 'Montserrat-Bold' },
             ]}
           >
             TobaFarm
           </Text>
         </View>
 
-          {/* CUSTOM DROPDOWN SELECTOR */}
-          <View
-            style={{ flex: 1, justifyContent: "center", alignItems: "center" }}
+        {/* Model Dropdown */}
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <TouchableOpacity
+            onPress={() => setIsDropdownOpen(!isDropdownOpen)}
+            style={[
+              ComponentStyles.roomChatDropdownTrigger,
+              {
+                backgroundColor: 'rgba(0,0,0,0.2)',
+                paddingHorizontal: 12,
+                paddingVertical: 6,
+                borderRadius: 12,
+              },
+            ]}
           >
-            <TouchableOpacity
-              onPress={() => setIsDropdownOpen(!isDropdownOpen)}
-              style={[
-                ComponentStyles.roomChatDropdownTrigger,
-                {
-                  backgroundColor: "rgba(0,0,0,0.2)",
-                  paddingHorizontal: 12,
-                  paddingVertical: 6,
-                  borderRadius: 12,
-                },
-              ]}
+            <Text
+              style={{
+                fontSize: 11,
+                fontFamily: 'Montserrat-SemiBold',
+                color: selectedModel === 'tofa-offline' ? '#ffb703' : '#4ade80',
+                marginRight: 4,
+              }}
             >
-              <Text
-                style={{
-                  fontSize: 11,
-                  fontFamily: "Montserrat-SemiBold",
-                  color:
-                    selectedModel === "tofa-offline" ? "#ffb703" : "#4ade80",
-                  marginRight: 4,
+              {selectedModel === 'tofa-offline' ? 'Mode Offline' : 'Mode Online'}
+            </Text>
+            <Ionicons
+              name={isDropdownOpen ? 'chevron-up' : 'chevron-down'}
+              size={14}
+              color="white"
+            />
+          </TouchableOpacity>
+
+          {isDropdownOpen && (
+            <View style={[ComponentStyles.dropdownModal, { top: 45, width: 160 }]}>
+              {/* Online option */}
+              <TouchableOpacity
+                style={ComponentStyles.dropdownItem}
+                onPress={() => {
+                  setSelectedModel(defaultOnlineModel);
+                  setIsDropdownOpen(false);
                 }}
               >
-                {selectedModel === "tofa-offline"
-                  ? "Mode Offline"
-                  : "Mode Online"}
-              </Text>
-              <Ionicons
-                name={isDropdownOpen ? "chevron-up" : "chevron-down"}
-                size={14}
-                color="white"
-              />
-            </TouchableOpacity>
+                <View style={ComponentStyles.dropdownItemRow}>
+                  <Text
+                    style={[
+                      ComponentTextStyles.dropdownModelName,
+                      {
+                        color:
+                          selectedModel !== 'tofa-offline'
+                            ? Colors.buttonPrimary
+                            : '#333',
+                      },
+                    ]}
+                  >
+                    Mode Online
+                  </Text>
+                  {selectedModel !== 'tofa-offline' && (
+                    <Ionicons name="checkmark" size={16} color={Colors.buttonPrimary} />
+                  )}
+                </View>
+              </TouchableOpacity>
 
-            {isDropdownOpen && (
-              <View
-                style={[ComponentStyles.dropdownModal, { top: 45, width: 160 }]}
-              >
-                {/* Opsi Online */}
+              {/* Offline option */}
+              <View style={ComponentStyles.dropdownOfflineRow}>
                 <TouchableOpacity
-                  style={ComponentStyles.dropdownItem}
+                  style={{
+                    flex: 1,
+                    flexDirection: 'row',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                  }}
+                  disabled={!isOfflineModelDownloaded}
                   onPress={() => {
-                    setSelectedModel(defaultOnlineModel);
+                    setSelectedModel('tofa-offline');
                     setIsDropdownOpen(false);
                   }}
                 >
-                  <View style={ComponentStyles.dropdownItemRow}>
-                    <Text
-                      style={[
-                        ComponentTextStyles.dropdownModelName,
-                        {
-                          color:
-                            selectedModel !== "tofa-offline"
-                              ? Colors.buttonPrimary
-                              : "#333",
-                        },
-                      ]}
-                    >
-                      Mode Online
-                    </Text>
-                    {selectedModel !== "tofa-offline" && (
-                      <Ionicons
-                        name="checkmark"
-                        size={16}
-                        color={Colors.buttonPrimary}
-                      />
-                    )}
-                  </View>
+                  <Text
+                    style={[
+                      ComponentTextStyles.dropdownModelName,
+                      {
+                        color:
+                          selectedModel === 'tofa-offline'
+                            ? Colors.buttonPrimary
+                            : '#333',
+                        opacity: isOfflineModelDownloaded ? 1 : 0.4,
+                      },
+                    ]}
+                  >
+                    Mode Offline
+                  </Text>
+                  {selectedModel === 'tofa-offline' && (
+                    <Ionicons name="checkmark" size={16} color={Colors.buttonPrimary} />
+                  )}
                 </TouchableOpacity>
 
-                {/* Opsi Offline */}
-                <View style={ComponentStyles.dropdownOfflineRow}>
+                {!isOfflineModelDownloaded && (
                   <TouchableOpacity
-                    style={{
-                      flex: 1,
-                      flexDirection: "row",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                    }}
-                    disabled={!isOfflineModelDownloaded}
                     onPress={() => {
-                      setSelectedModel("tofa-offline");
+                      setDownloadModelVisible(true);
                       setIsDropdownOpen(false);
                     }}
+                    style={{ paddingLeft: 8 }}
                   >
-                    <Text
-                      style={[
-                        ComponentTextStyles.dropdownModelName,
-                        {
-                          color:
-                            selectedModel === "tofa-offline"
-                              ? Colors.buttonPrimary
-                              : "#333",
-                          opacity: isOfflineModelDownloaded ? 1 : 0.4,
-                        },
-                      ]}
-                    >
-                      Mode Offline
-                    </Text>
-                    {selectedModel === "tofa-offline" && (
-                      <Ionicons
-                        name="checkmark"
-                        size={16}
-                        color={Colors.buttonPrimary}
-                      />
-                    )}
+                    <Ionicons
+                      name="download-outline"
+                      size={20}
+                      color={Colors.buttonPrimary}
+                    />
                   </TouchableOpacity>
-
-                  {!isOfflineModelDownloaded && (
-                    <TouchableOpacity
-                      onPress={() => {
-                        setDownloadModelVisible(true);
-                        setIsDropdownOpen(false);
-                      }}
-                      style={{ paddingLeft: 8 }}
-                    >
-                      <Ionicons
-                        name="download-outline"
-                        size={20}
-                        color={Colors.buttonPrimary}
-                      />
-                    </TouchableOpacity>
-                  )}
-                </View>
+                )}
               </View>
-            )}
-          </View>
-
-          <View
-            style={{
-              flex: 1,
-              justifyContent: "center",
-              alignItems: "flex-end",
-            }}
-          >
-            <TouchableOpacity
-              onPress={() => router.push("/login")}
-              style={{
-                backgroundColor: Colors.white,
-                paddingHorizontal: 14,
-                paddingVertical: 6,
-                borderRadius: 16,
-              }}
-            >
-              <Text
-                style={{
-                  color: Colors.backgroundPrimary,
-                  fontFamily: "Montserrat-SemiBold",
-                  fontSize: 12,
-                }}
-              >
-                Login
-              </Text>
-            </TouchableOpacity>
-          </View>
+            </View>
+          )}
         </View>
 
-      {/* Backdrop Dropdown */}
+        {/* Login button */}
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'flex-end' }}>
+          <TouchableOpacity
+            onPress={() => router.push('/login')}
+            style={{
+              backgroundColor: Colors.white,
+              paddingHorizontal: 14,
+              paddingVertical: 6,
+              borderRadius: 16,
+            }}
+          >
+            <Text
+              style={{
+                color: Colors.backgroundPrimary,
+                fontFamily: 'Montserrat-SemiBold',
+                fontSize: 12,
+              }}
+            >
+              Login
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      {/* Dropdown backdrop */}
       {isDropdownOpen && (
         <TouchableOpacity
           activeOpacity={1}
@@ -427,48 +248,44 @@ export default function RoomGuest() {
         />
       )}
 
-      {/* ===== AREA CHAT & INPUT ===== */}
+      {/* ===== CHAT AREA ===== */}
       <KeyboardAvoidingView
         style={{ flex: 1 }}
-        behavior={Platform.OS === "ios" ? "padding" : "padding"}
-        enabled={Platform.OS === "ios" || isKeyboardVisible}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'padding'}
+        enabled={Platform.OS === 'ios' || isKeyboardVisible}
       >
-        {/* ===== CHAT LIST ===== */}
-      <View style={ComponentStyles.chatListContainer}>
-        <View
-          style={[
-            ComponentStyles.syncBanner,
-            { backgroundColor: "rgba(255,255,255,0.1)" },
-          ]}
-        >
-          <Text
-            style={[ComponentTextStyles.syncBannerText, { color: "#ccc" }]}
+        {/* Chat list */}
+        <View style={ComponentStyles.chatListContainer}>
+          <View
+            style={[
+              ComponentStyles.syncBanner,
+              { backgroundColor: 'rgba(255,255,255,0.1)' },
+            ]}
           >
-            Mode Tamu: Percakapan ini tidak tersimpan
-          </Text>
+            <Text style={[ComponentTextStyles.syncBannerText, { color: '#ccc' }]}>
+              Mode Tamu: Percakapan ini tidak tersimpan
+            </Text>
+          </View>
+          <ChatList data={activeMessagesUI} />
         </View>
 
-        <ChatList data={activeMessagesUI} />
-      </View>
-
-      {/* ===== INPUT ===== */}
-      <View
-        pointerEvents={isSending ? "none" : "auto"}
-        style={[Layout.chatInputContainer, { paddingBottom: isKeyboardVisible ? 10 : insets.bottom + 10 }]}
-      >
-        <ChatInput
-          model={selectedModel}
-          onSend={(text) => onSend(undefined, text)}
-          placeholder={
-            isSending
-              ? `ToFa Sedang Menjawab${typingDots}`
-              : "Tanyakan sesuatu..."
-          }
-        />
-      </View>
+        {/* Input */}
+        <View
+          pointerEvents={isSending ? 'none' : 'auto'}
+          style={[
+            Layout.chatInputContainer,
+            { paddingBottom: isKeyboardVisible ? 10 : insets.bottom + 10 },
+          ]}
+        >
+          <ChatInput
+            model={selectedModel}
+            onSend={(text) => onSend(undefined, text)}
+            placeholder={isSending ? `ToFa Sedang Menjawab${typingDots}` : 'Tanyakan sesuatu...'}
+          />
+        </View>
       </KeyboardAvoidingView>
 
-      {/* ===== MODALS & OVERLAYS ===== */}
+      {/* ===== MODALS ===== */}
       <NotificationModal
         visible={!!notification}
         title={notification?.title}
@@ -481,10 +298,20 @@ export default function RoomGuest() {
         onClose={() => setDownloadModelVisible(false)}
         onDownloadSuccess={() => {
           checkOfflineModel();
-          setSelectedModel("tofa-offline");
+          setSelectedModel('tofa-offline');
           setDownloadModelVisible(false);
         }}
       />
     </SafeAreaView>
+  );
+}
+
+// --- Root export ---
+
+export default function RoomGuest() {
+  return (
+    <GuestProvider>
+      <RoomGuestInner />
+    </GuestProvider>
   );
 }

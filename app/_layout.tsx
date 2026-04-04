@@ -7,9 +7,12 @@ export default function Layout() {
   // Load font aplikasi
   const [loaded] = useFonts({
     'Montserrat-SemiBold': require('../assets/fonts/static/Montserrat-SemiBold.ttf'),
+    'Montserrat-SemiBoldItalic': require('../assets/fonts/static/Montserrat-SemiBoldItalic.ttf'),
     'Montserrat-Italic': require('../assets/fonts/static/Montserrat-Italic.ttf'),
     'Montserrat-Medium': require('../assets/fonts/static/Montserrat-Medium.ttf'),
     'Montserrat-Regular': require('../assets/fonts/static/Montserrat-Regular.ttf'),
+    'Montserrat-Bold': require('../assets/fonts/static/Montserrat-Bold.ttf'),
+    'Montserrat-BoldItalic': require('../assets/fonts/static/Montserrat-BoldItalic.ttf'),
   });
 
   // Tampilkan loading global saat font belum siap

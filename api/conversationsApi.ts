@@ -26,14 +26,14 @@ apiClient.interceptors.response.use(
   (response) => response,
   async (error) => {
     if (error.response && error.response.status === 401) {
-      console.warn("Token expired atau tidak valid. Mengarahkan ke Login...");
+      console.warn("Token expired atau tidak valid. Mengarahkan ke Home...");
       try {
         await removeValueFor("token");
         await removeValueFor("user");
       } catch (e) {
         console.error("Gagal menghapus sesi lokal:", e);
       }
-      router.replace("/login");
+      router.replace("/");
     }
     return Promise.reject(error);
   }

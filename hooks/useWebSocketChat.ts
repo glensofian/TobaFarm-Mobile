@@ -118,6 +118,11 @@ export function useWebSocketChat({
       };
 
       ws.onmessage = (event) => {
+        if (saveTimeoutRef.current) {
+          clearTimeout(saveTimeoutRef.current);
+          saveTimeoutRef.current = null;
+        }
+
         const rawData = event.data;
         console.log("WS received:", rawData);
         const cid = currentCidRef.current || getCidRef.current();
@@ -148,7 +153,13 @@ export function useWebSocketChat({
           if (rawData.startsWith("{") && rawData.endsWith("}")) {
             try {
               const parsed = JSON.parse(rawData);
-              token = parsed.token || parsed.text || parsed.content || rawData;
+              // Ignore heartbeat messages silently
+              if (parsed.heartbeat === true) {
+                console.log("[WS] Heartbeat received, ignoring.");
+                return;
+              }
+              token = parsed.token || parsed.text || parsed.content || "";
+              if (!token) return;
             } catch {
               token = rawData;
             }
@@ -159,7 +170,7 @@ export function useWebSocketChat({
           token = String(rawData ?? "");
         }
 
-        if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+        if (!token) return;
 
         fullRef.current += token;
         onTokenRef.current(cid, token);
@@ -247,14 +258,12 @@ export function useWebSocketChat({
         
         let contextText = "";
         try {
-          // 1. Fetch Top 5 Text Chunks with 0.4 threshold (matching server)
           const textResults = await vectorStore.query({ 
             queryText: text, 
             nResults: 5,
             predicate: (r) => (r.similarity || 0) >= 0.4 && r.metadata?.content_type !== 'image'
           });
 
-          // 2. Fetch Top 2 Image Captions with 0.4 threshold
           const imageResults = await vectorStore.query({ 
             queryText: text, 
             nResults: 2,
@@ -292,7 +301,6 @@ export function useWebSocketChat({
           contextText = "No relevant information found in the documents.";
         }
 
-        // 3. Fetch Chat History (matching server limit=6)
         let historyMessages: any[] = [];
         try {
           const localHistory = await ChatRepository.getMessagesByConversation(targetCid, 6);
@@ -317,7 +325,7 @@ export function useWebSocketChat({
         The context:
         ${contextText}`;
 
-        onTokenRef.current(targetCid, ""); // Signal start
+        onTokenRef.current(targetCid, "");
         
         const full = await llm.generate(
           [

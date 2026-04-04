@@ -2,6 +2,8 @@ import { View, Text, Image, TouchableOpacity, Alert } from 'react-native';
 import { ComponentStyles, ComponentTextStyles } from '../styles';
 import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
+import MarkdownText from './MarkdownText';
+import { Colors } from '../styles';
 
 export default function ChatBubble({ type, text }: any) {
   const isUser = type === 'user';
@@ -13,8 +15,8 @@ export default function ChatBubble({ type, text }: any) {
       "What would you like to do?",
       [
         { text: "Cancel", style: "cancel" },
-        { 
-          text: "Copy Message", 
+        {
+          text: "Copy Message",
           onPress: async () => {
             await Clipboard.setStringAsync(text);
           }
@@ -26,8 +28,8 @@ export default function ChatBubble({ type, text }: any) {
   // ===== USER MESSAGE =====
   if (isUser) {
     return (
-      <TouchableOpacity 
-        activeOpacity={0.9} 
+      <TouchableOpacity
+        activeOpacity={0.9}
         onLongPress={handleLongPress}
         style={[
           ComponentStyles.chatBubble,
@@ -47,27 +49,26 @@ export default function ChatBubble({ type, text }: any) {
     );
   }
 
-  // ===== AI MESSAGE =====
+  // ===== AI MESSAGE — rendered with Markdown =====
   return (
     <View style={ComponentStyles.chatBubbleAIWrapper}>
       {/* AI ICON */}
       <Image
         source={require('../assets/images/tobafarm-logo.png')}
-        style={ComponentStyles.chatAIAvatar}
+        style={[ComponentStyles.chatAIAvatar, { marginTop: 2 }]}
       />
 
-      {/* AI TEXT */}
-      <TouchableOpacity 
-        activeOpacity={0.9} 
+      {/* AI TEXT — Markdown rendered */}
+      <TouchableOpacity
+        activeOpacity={0.9}
         onLongPress={handleLongPress}
         style={ComponentStyles.chatBubbleAI}
       >
-        <Text 
-          selectable={true}
-          style={ComponentTextStyles.chatBubbleText}
-        >
-          {text}
-        </Text>
+        <MarkdownText
+          text={text}
+          fontSize={13}
+          color={Colors.textSecondary}
+        />
       </TouchableOpacity>
     </View>
   );
