@@ -82,6 +82,7 @@ export default function Sidebar({
   const [isVisible, setIsVisible] = useState(showSidebar);
   const slideAnim = useRef(new Animated.Value(showSidebar ? 0 : -300)).current;
   const fadeAnim = useRef(new Animated.Value(showSidebar ? 1 : 0)).current;
+  const searchAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     if (showSidebar) {
@@ -112,9 +113,21 @@ export default function Sidebar({
         }),
       ]).start(() => {
         setIsVisible(false);
+        setRenamingId(null);
+        setRenamingValue("");
+        setOpenMenuId(null);
       });
     }
   }, [showSidebar]);
+
+  // Animasi search
+  useEffect(() => {
+    Animated.timing(searchAnim, {
+      toValue: searchOpen ? 1 : 0,
+      duration: 250,
+      useNativeDriver: true,
+    }).start();
+  }, [searchOpen]);
 
   if (!isVisible) return null;
 
@@ -166,48 +179,62 @@ export default function Sidebar({
             }}
           >
             {/* HEADER */}
-            <View style={ComponentStyles.sidebarHeader}>
-              {searchOpen ? (
-                <View style={{ 
-                  flex: 1, 
+            <View style={[ComponentStyles.sidebarHeader, { height: 42, overflow: 'hidden' }]}> 
+              {/* SEARCH BAR ANIMATED */}
+              {searchOpen && (
+                <Animated.View style={{ 
+                  position: 'absolute',
+                  top: 0, 
+                  left: 10, 
+                  right: 10, 
+                  bottom: 0,
+                  zIndex: 2,
                   flexDirection: 'row', 
                   alignItems: 'center', 
                   backgroundColor: '#FFFFFF', 
                   borderWidth: 1,
                   borderColor: '#CCCCCC',
                   borderRadius: 10, 
-                  paddingHorizontal: 12, 
-                  height: 42 
+                  paddingHorizontal: 8, 
+                  opacity: searchAnim,
+                  transform: [{ scaleY: searchAnim.interpolate({ inputRange:[0, 1], outputRange:[0.8, 1]}) }]
                 }}>
-                  <Ionicons name="search" size={18} color={'#888'} style={{ marginRight: 8 }} />
+                  <TouchableOpacity onPress={() => { setSearchOpen(() => false); setSearchQuery(''); }}>
+                    <Ionicons name="arrow-back" size={20} color={Colors.black} style={{ padding: 4 }} />
+                  </TouchableOpacity>
+                  
                   <TextInput
-                    style={{ flex: 1, fontFamily: 'Montserrat-Regular', fontSize: 14, color: Colors.black, paddingVertical: 0 }}
+                    style={{ flex: 1, fontFamily: 'Montserrat-Regular', fontSize: 14, color: Colors.black, paddingVertical: 0, paddingHorizontal: 4 }}
                     value={searchQuery}
                     onChangeText={setSearchQuery}
                     placeholder={t?.searchPlaceholder || "Cari percakapan..."}
                     placeholderTextColor="#999"
                     autoFocus
                   />
+                  
                   {searchQuery.length > 0 ? (
                     <TouchableOpacity onPress={() => setSearchQuery('')} style={{ padding: 4 }}>
                       <Ionicons name="close-circle" size={18} color={'#999'} />
                     </TouchableOpacity>
                   ) : null}
-                  <TouchableOpacity onPress={() => { setSearchOpen(() => false); setSearchQuery(''); }} style={{ padding: 4, marginLeft: 4 }}>
-                    <Ionicons name="close" size={20} color={Colors.black} />
-                  </TouchableOpacity>
-                </View>
-              ) : (
-                <>
-                  <TouchableOpacity onPress={onClose}>
-                    <Ionicons name="menu" size={22} color={Colors.black} />
-                  </TouchableOpacity>
-                  <View style={{ flex: 1 }} />
-                  <TouchableOpacity onPress={() => setSearchOpen(() => true)}>
-                    <Ionicons name="search" size={20} color={Colors.black} />
-                  </TouchableOpacity>
-                </>
+                </Animated.View>
               )}
+
+              {/* DEFAULT HEADER */}
+              <Animated.View style={{ 
+                flex: 1, 
+                flexDirection: 'row', 
+                alignItems: 'center',
+                opacity: searchAnim.interpolate({ inputRange:[0, 1], outputRange:[1, 0] })
+              }}>
+                <TouchableOpacity onPress={onClose}>
+                  <Ionicons name="menu" size={22} color={Colors.black} />
+                </TouchableOpacity>
+                <View style={{ flex: 1 }} />
+                <TouchableOpacity onPress={() => setSearchOpen(() => true)}>
+                  <Ionicons name="search" size={20} color={Colors.black} />
+                </TouchableOpacity>
+              </Animated.View>
             </View>
 
             {/* NEW CHAT */}

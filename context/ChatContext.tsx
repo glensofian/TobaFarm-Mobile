@@ -515,7 +515,12 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
 
     let threadId = forceNewChat ? "" : activeConversationId;
     const isNewChat = !threadId;
-    const generatedTitle = truncateTitle(text, 28);
+    
+    let generatedTitle = text.trim().split("\n")[0]; 
+    if (generatedTitle.length > 120) {
+      generatedTitle = generatedTitle.slice(0, 117) + "...";
+    }
+    
     const isOffline = selectedModel === 'tofa-offline';
 
     if (isNewChat) {
@@ -636,29 +641,30 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
         await api.deleteConversation(id);
       }
       await ChatRepository.deleteConversation(id);
-      
-      const remaining = conversations.filter(c => c.id !== id);
-      setConversations(remaining);
 
-      // Kosongkan pesan di UI segera agar terasa "terhapus" seketika
+      setConversations((prev) => {
+        const next = prev.filter(c => c.id !== id);
+        
+        if (activeConversationId === id) {
+          if (next.length === 0) {
+            setTimeout(() => router.replace("/"), 300);
+          } else {
+            setActiveConversationId("");
+          }
+          setSidebarOpen(false);
+        }
+        return next;
+      });
+
       setMessagesByConversation(prev => {
         const next = { ...prev };
         delete next[id];
         return next;
       });
-      
-      if (activeConversationId === id) {
-        if (remaining.length === 0) {
-          setTimeout(() => router.replace("/"), 300);
-        } else {
-          setActiveConversationId("");
-        }
-      }
-      setSidebarOpen(false); 
     } catch (e) {
       Alert.alert("Gagal Menghapus", "Terjadi kesalahan saat menghapus percakapan.");
     }
-  }, [activeConversationId, api, isInternetReachable]);
+  }, [api, isInternetReachable, activeConversationId, router]);
 
   const handleRenameConversation = useCallback(async (id: string, newTitle: string) => {
     try {
