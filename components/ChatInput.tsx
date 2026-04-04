@@ -7,6 +7,7 @@ import {
   Colors,
 } from '../styles';
 import { useNetwork } from '@/context/NetworkContext';
+import { useLanguage } from '../context/LanguageContext';
 
 type Props = {
   onSend?: (text: string) => void;
@@ -16,6 +17,7 @@ type Props = {
 };
 
 export default function ChatInput({ onSend, model, placeholder, isLoading }: Props) {
+  const { t } = useLanguage();
   const [value, setValue] = useState('');
   const { isInternetReachable, isConnected } = useNetwork();
   const inputRef = useRef<TextInput>(null);
@@ -30,7 +32,7 @@ export default function ChatInput({ onSend, model, placeholder, isLoading }: Pro
   const handleSend = () => {
     if (isLoading || !value.trim()) return;
     if (model !== 'tofa-offline' && (!isInternetReachable || !isConnected)) {
-      Alert.alert('No Internet', 'Please check your internet connection');
+      Alert.alert(t.roomChat.noInternet, t.roomChat.checkConnection);
       return;
     }
     onSend?.(value);
@@ -46,7 +48,7 @@ export default function ChatInput({ onSend, model, placeholder, isLoading }: Pro
         ref={inputRef}
         value={value}
         onChangeText={setValue}
-        placeholder={isLoading ? "AI sedang menjawab..." : (placeholder || "Tanyakan sesuatu...")}
+        placeholder={isLoading ? t.roomChat.answering : (placeholder || t.roomChat.placeholder)}
         placeholderTextColor={Colors.placeholder}
         editable={!isLoading}
         style={[

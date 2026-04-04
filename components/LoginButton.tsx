@@ -1,9 +1,11 @@
 import { View, Text, TouchableOpacity } from 'react-native';
 import { useRouter } from 'expo-router';
 import { ComponentStyles, Typography, Colors } from '../styles';
+import { useLanguage } from '../context/LanguageContext';
 
 export default function LoginButton() {
   const router = useRouter();
+  const { t } = useLanguage();
 
   return (
     <View style={ComponentStyles.loginButtonWrapper}>
@@ -12,7 +14,7 @@ export default function LoginButton() {
         onPress={() => router.push('/login')}
       >
         <Text style={[Typography.button, { color: Colors.white }]}>
-          Log In
+          {t.landing.loginButton}
         </Text>
       </TouchableOpacity>
     </View>

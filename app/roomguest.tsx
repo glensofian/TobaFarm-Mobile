@@ -15,6 +15,7 @@ import ChatList from '../components/ChatList';
 import DownloadModel from '../components/DownloadModel';
 import NotificationModal from '../components/NotificationModal';
 import { GuestProvider, useGuest } from '../context/GuestContext';
+import { useLanguage } from '../context/LanguageContext';
 import {
   Colors,
   Layout,
@@ -28,6 +29,7 @@ function RoomGuestInner() {
   const router = useRouter();
   const { prompt } = useLocalSearchParams<{ prompt?: string }>();
   const insets = useSafeAreaInsets();
+  const { t } = useLanguage();
 
   // --- State Keyboard visibility ---
   const [isKeyboardVisible, setKeyboardVisible] = useState(false);
@@ -88,51 +90,32 @@ function RoomGuestInner() {
     >
       {/* ===== HEADER ===== */}
       <View style={[ComponentStyles.roomChatHeader, { height: 60, zIndex: 20 }]}>
-        {/* Title */}
-        <View style={{ flex: 1, justifyContent: 'center' }}>
-          <Text
-            style={[
-              ComponentTextStyles.roomChatHeaderTitle,
-              { fontSize: 20, fontFamily: 'Montserrat-Bold' },
-            ]}
-          >
-            TobaFarm
-          </Text>
-        </View>
+        {/* Left spacer for symmetry */}
+        <View style={{ width: 60 }} />
 
-        {/* Model Dropdown */}
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        {/* Center Title & Model Dropdown */}
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
           <TouchableOpacity
             onPress={() => setIsDropdownOpen(!isDropdownOpen)}
-            style={[
-              ComponentStyles.roomChatDropdownTrigger,
-              {
-                backgroundColor: 'rgba(0,0,0,0.2)',
-                paddingHorizontal: 12,
-                paddingVertical: 6,
-                borderRadius: 12,
-              },
-            ]}
+            style={{ alignItems: 'center' }}
           >
-            <Text
-              style={{
-                fontSize: 11,
-                fontFamily: 'Montserrat-SemiBold',
-                color: selectedModel === 'tofa-offline' ? '#ffb703' : '#4ade80',
-                marginRight: 4,
-              }}
-            >
-              {selectedModel === 'tofa-offline' ? 'Mode Offline' : 'Mode Online'}
+            <Text style={ComponentTextStyles.roomChatHeaderTitle}>
+              TobaFarm
             </Text>
-            <Ionicons
-              name={isDropdownOpen ? 'chevron-up' : 'chevron-down'}
-              size={14}
-              color="white"
-            />
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: -2 }}>
+              <Text style={{ 
+                color: 'rgba(255,255,255,0.7)', 
+                fontSize: 10, 
+                fontFamily: 'Montserrat-Medium' 
+              }}>
+                {selectedModel === 'tofa-offline' ? t.roomChat.offlineMode : t.roomChat.onlineMode}
+              </Text>
+              <Ionicons name={isDropdownOpen ? "chevron-up" : "chevron-down"} size={10} color="rgba(255,255,255,0.7)" style={{ marginLeft: 4 }} />
+            </View>
           </TouchableOpacity>
 
           {isDropdownOpen && (
-            <View style={[ComponentStyles.dropdownModal, { top: 45, width: 160 }]}>
+            <View style={[ComponentStyles.dropdownModal, { top: 45, width: 170 }]}>
               {/* Online option */}
               <TouchableOpacity
                 style={ComponentStyles.dropdownItem}
@@ -142,18 +125,11 @@ function RoomGuestInner() {
                 }}
               >
                 <View style={ComponentStyles.dropdownItemRow}>
-                  <Text
-                    style={[
+                  <Text style={[
                       ComponentTextStyles.dropdownModelName,
-                      {
-                        color:
-                          selectedModel !== 'tofa-offline'
-                            ? Colors.buttonPrimary
-                            : '#333',
-                      },
-                    ]}
-                  >
-                    Mode Online
+                      { color: selectedModel !== 'tofa-offline' ? Colors.buttonPrimary : '#333' }
+                  ]}>
+                    {t.roomChat.onlineMode}
                   </Text>
                   {selectedModel !== 'tofa-offline' && (
                     <Ionicons name="checkmark" size={16} color={Colors.buttonPrimary} />
@@ -164,31 +140,21 @@ function RoomGuestInner() {
               {/* Offline option */}
               <View style={ComponentStyles.dropdownOfflineRow}>
                 <TouchableOpacity
-                  style={{
-                    flex: 1,
-                    flexDirection: 'row',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                  }}
+                  style={{ flex: 1, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}
                   disabled={!isOfflineModelDownloaded}
                   onPress={() => {
                     setSelectedModel('tofa-offline');
                     setIsDropdownOpen(false);
                   }}
                 >
-                  <Text
-                    style={[
+                  <Text style={[
                       ComponentTextStyles.dropdownModelName,
-                      {
-                        color:
-                          selectedModel === 'tofa-offline'
-                            ? Colors.buttonPrimary
-                            : '#333',
-                        opacity: isOfflineModelDownloaded ? 1 : 0.4,
-                      },
-                    ]}
-                  >
-                    Mode Offline
+                      { 
+                        color: selectedModel === 'tofa-offline' ? Colors.buttonPrimary : '#333',
+                        opacity: isOfflineModelDownloaded ? 1 : 0.4
+                      }
+                  ]}>
+                    {t.roomChat.offlineMode}
                   </Text>
                   {selectedModel === 'tofa-offline' && (
                     <Ionicons name="checkmark" size={16} color={Colors.buttonPrimary} />
@@ -203,11 +169,7 @@ function RoomGuestInner() {
                     }}
                     style={{ paddingLeft: 8 }}
                   >
-                    <Ionicons
-                      name="download-outline"
-                      size={20}
-                      color={Colors.buttonPrimary}
-                    />
+                    <Ionicons name="download-outline" size={18} color={Colors.buttonPrimary} />
                   </TouchableOpacity>
                 )}
               </View>
@@ -216,14 +178,14 @@ function RoomGuestInner() {
         </View>
 
         {/* Login button */}
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'flex-end' }}>
+        <View style={{ width: 60, alignItems: 'flex-end' }}>
           <TouchableOpacity
             onPress={() => router.push('/login')}
             style={{
               backgroundColor: Colors.white,
-              paddingHorizontal: 14,
-              paddingVertical: 6,
-              borderRadius: 16,
+              paddingHorizontal: 12,
+              paddingVertical: 5,
+              borderRadius: 15,
             }}
           >
             <Text
@@ -233,7 +195,7 @@ function RoomGuestInner() {
                 fontSize: 12,
               }}
             >
-              Login
+              {t.roomChat.login}
             </Text>
           </TouchableOpacity>
         </View>
@@ -263,7 +225,7 @@ function RoomGuestInner() {
             ]}
           >
             <Text style={[ComponentTextStyles.syncBannerText, { color: '#ccc' }]}>
-              Mode Tamu: Percakapan ini tidak tersimpan
+              {t.roomChat.guestMode}
             </Text>
           </View>
           <ChatList data={activeMessagesUI} />
@@ -280,10 +242,11 @@ function RoomGuestInner() {
           <ChatInput
             model={selectedModel}
             onSend={(text) => onSend(undefined, text)}
-            placeholder={isSending ? `ToFa Sedang Menjawab${typingDots}` : 'Tanyakan sesuatu...'}
+            placeholder={isSending ? `${t.roomChat.answering}${typingDots}` : t.roomChat.placeholder}
           />
         </View>
       </KeyboardAvoidingView>
+
 
       {/* ===== MODALS ===== */}
       <NotificationModal

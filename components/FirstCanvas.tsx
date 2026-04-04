@@ -2,6 +2,7 @@ import React, { useMemo, useEffect, useRef } from 'react';
 import { View, Text, Image, Animated } from 'react-native';
 import ChatInput from './ChatInput';
 import { ComponentStyles, ComponentTextStyles, Typography } from '../styles';
+import { useLanguage } from '../context/LanguageContext';
 
 type Props = {
   username?: string;
@@ -10,13 +11,15 @@ type Props = {
 };
 
 export default function FirstCanvas({ username, onSend, selectedModel }: Props) {
-  const greeting = useMemo(() => {
+  const { t } = useLanguage();
+
+  const greetingStr = useMemo(() => {
     const hour = new Date().getHours();
-    if (hour >= 4 && hour < 11) return "Selamat Pagi";
-    if (hour >= 11 && hour < 15) return "Selamat Siang";
-    if (hour >= 15 && hour < 18) return "Selamat Sore";
-    return "Selamat Malam";
-  }, []);
+    if (hour >= 4 && hour < 11) return t.landing.greetingMorning;
+    if (hour >= 11 && hour < 15) return t.landing.greetingAfternoon;
+    if (hour >= 15 && hour < 18) return t.landing.greetingEvening;
+    return t.landing.greetingNight;
+  }, [t.landing]);
 
   const fadeLogo = useRef(new Animated.Value(0)).current;
   const fadePrompt = useRef(new Animated.Value(0)).current;
@@ -61,11 +64,11 @@ export default function FirstCanvas({ username, onSend, selectedModel }: Props) 
           { opacity: fadePrompt, transform: [{ translateY: slidePrompt }] }
         ]}>
           <Text style={[Typography.greeting, ComponentTextStyles.homeGreeting]}>
-            Halo{username ? `, ${username}` : ""}. {greeting}
+            {t.landing.greeting}{username ? `, ${username}` : ""}. {greetingStr}
           </Text>
 
           <Text style={[Typography.question, ComponentTextStyles.homeQuestion]}>
-            Apa yang boleh saya bantu ?
+            {t.landing.helpText}
           </Text>
 
           <ChatInput 

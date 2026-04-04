@@ -21,8 +21,11 @@ import NotificationModal from '../components/NotificationModal';
 import SettingsModal from '../components/SettingsModal';
 import ChangePasswordModal from '../components/ChangePasswordModal';
 import { ChatProvider, useChat } from '../context/ChatContext';
+import { useLanguage } from '../context/LanguageContext';
+import { useNetwork } from '../context/NetworkContext';
 import { Colors, Layout, ComponentStyles, ComponentTextStyles } from '../styles';
-import { translations } from '../constants/i18n/translations';
+import { translations } from '../i18n';
+import { models } from '../constants/models';
 
 // --- Inner component { Context } ---
 
@@ -30,10 +33,11 @@ function RoomChatInner() {
   const router = useRouter();
   const { prompt } = useLocalSearchParams<{ prompt?: string }>();
   const insets = useSafeAreaInsets();
+  const { t } = useLanguage();
+  const { isInternetReachable } = useNetwork();
   
   // --- State Keyboard visibility ---
   const [isKeyboardVisible, setKeyboardVisible] = useState(false);
-  const t = translations['id'];
 
   // --- Modal States ---
   const [settingsVisible, setSettingsVisible] = useState(false);
@@ -82,6 +86,12 @@ function RoomChatInner() {
 
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
 
+  const models = [
+    { id: 'tofa-lite', label: 'ToFa Lite' },
+    { id: 'tofa-pro', label: 'ToFa Pro' },
+    { id: 'tofa-ultra', label: 'ToFa Ultra' }
+  ];
+
   // Initial prompt handling
   useEffect(() => {
     const isReady = wsStatus === 'open' || selectedModel === 'tofa-offline';
@@ -120,7 +130,7 @@ function RoomChatInner() {
 
       {/* ===== HEADER ===== */}
       <View style={ComponentStyles.roomChatHeader}>
-        <TouchableOpacity onPress={() => setSidebarOpen(!sidebarOpen)}>
+        <TouchableOpacity onPress={() => setSidebarOpen(true)}>
           <Ionicons name="menu" size={24} color={Colors.white} />
         </TouchableOpacity>
 
@@ -129,18 +139,34 @@ function RoomChatInner() {
             onPress={() => setModelsModalVisible(!modelsModalVisible)}
             style={ComponentStyles.roomChatDropdownTrigger}
           >
-            <Text style={ComponentTextStyles.roomChatHeaderTitle}>TobaFarm</Text>
-            <Ionicons name="chevron-down-outline" size={20} color={Colors.white} />
+            <View style={{ alignItems: 'center' }}>
+              <Text style={ComponentTextStyles.roomChatHeaderTitle}>
+                TobaFarm
+              </Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: -2 }}>
+                <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 10, fontFamily: 'Montserrat-Medium' }}>
+                  {models.find(m => m.id === selectedModel)?.label || "Model"}
+                </Text>
+                <Ionicons name="chevron-down" size={10} color="rgba(255,255,255,0.7)" style={{ marginLeft: 4 }} />
+              </View>
+            </View>
           </TouchableOpacity>
+
+          {/* Online/Offline Status */}
+          {isInternetReachable === false && (
+            <Text style={{ color: '#FFD700', fontSize: 10, fontWeight: '700', marginTop: -2 }}>
+              {t.roomChat.offline}
+            </Text>
+          )}
 
           {modelsModalVisible && (
             <View style={ComponentStyles.dropdownModal}>
               <View style={ComponentStyles.dropdownHeader}>
-                <Text style={ComponentTextStyles.dropdownHeaderText}>Pilih Model</Text>
+                <Text style={ComponentTextStyles.dropdownHeaderText}>{t.roomChat.activeModel}</Text>
               </View>
 
               {/* Online Models */}
-              {[{ id: 'tofa-lite', label: 'ToFa Lite' }, { id: 'tofa-pro', label: 'ToFa Pro' }, { id: 'tofa-ultra', label: 'ToFa Ultra' }].map((model) => (
+              {models.map((model) => (
                 <TouchableOpacity
                   key={model.id}
                   onPress={() => {
@@ -181,7 +207,7 @@ function RoomChatInner() {
                       ComponentTextStyles.dropdownModelName,
                       { color: selectedModel === 'tofa-offline' ? Colors.backgroundPrimary : '#333' }
                     ]}>
-                      Mode Offline
+                      {t.roomChat.offlineMode}
                     </Text>
                     {selectedModel === 'tofa-offline' && (
                       <Ionicons name="checkmark" size={18} color={Colors.backgroundPrimary} style={{ marginRight: 8 }} />
@@ -241,7 +267,7 @@ function RoomChatInner() {
               {isSyncing && (
                 <View style={ComponentStyles.syncBanner}>
                   <Text style={ComponentTextStyles.syncBannerText}>
-                    Menyinkronkan percakapan...
+                    {t.roomChat.syncing}
                   </Text>
                 </View>
               )}
@@ -259,7 +285,7 @@ function RoomChatInner() {
                 model={selectedModel}
                 isLoading={isSending}
                 onSend={(text) => onSend(undefined, text)}
-                placeholder={isSending ? `ToFa Sedang Menjawab${typingDots}` : "Tanyakan sesuatu..."}
+                placeholder={isSending ? `${t.roomChat.answering}${typingDots}` : t.roomChat.placeholder}
               />
             </View>
           </>
@@ -275,7 +301,6 @@ function RoomChatInner() {
       {/* ===== SIDEBAR ===== */}
       <Sidebar
         user={user!}
-        t={t}
         showSidebar={sidebarOpen}
         setShowSidebar={setSidebarOpen}
         sidebarCollapsed={sidebarOpen}

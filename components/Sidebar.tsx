@@ -5,7 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { UserProfile } from '@/types';
 import { useRouter } from 'expo-router';
-import type { Translation } from "../constants/i18n/translations";
+import { useLanguage } from '../context/LanguageContext';
 import {
   Colors,
   ComponentStyles,
@@ -16,8 +16,6 @@ import { removeValueFor } from '../utils/storage';
 
 type Props = {
   user: UserProfile;
-
-  t: Translation;
 
   showSidebar: boolean;
   setShowSidebar: (v: boolean) => void;
@@ -52,7 +50,6 @@ type Props = {
 
 export default function Sidebar({
   user,
-  t,
   showSidebar,
   setShowSidebar,
   sidebarCollapsed,
@@ -75,6 +72,7 @@ export default function Sidebar({
   searchInputRef,
   
 }: Props) {
+  const { t } = useLanguage();
   const router = useRouter();
   const [settingsModal, showSettingsModal] = useState(false);
   const [renamingId, setRenamingId] = useState<string | null>(null);
@@ -207,7 +205,7 @@ export default function Sidebar({
                     style={{ flex: 1, fontFamily: 'Montserrat-Regular', fontSize: 14, color: Colors.black, paddingVertical: 0, paddingHorizontal: 4 }}
                     value={searchQuery}
                     onChangeText={setSearchQuery}
-                    placeholder={t?.searchPlaceholder || "Cari percakapan..."}
+                    placeholder={t?.roomChat.searchPlaceholder || "Cari percakapan..."}
                     placeholderTextColor="#999"
                     autoFocus
                   />
@@ -249,7 +247,7 @@ export default function Sidebar({
             >
               <Ionicons name="create-outline" size={18} color={Colors.black} />
               <Text style={ComponentTextStyles.sidebarNewChatText}>
-                {t?.newChatTitle || "Percakapan Baru"}
+                {t?.roomChat.newChat || "Percakapan Baru"}
               </Text>
             </TouchableOpacity>
 
@@ -259,7 +257,7 @@ export default function Sidebar({
               showsVerticalScrollIndicator={false}
             >
               <Text style={ComponentTextStyles.sidebarSectionTitle}>
-                {t?.yourChats || "Percakapan Anda"}
+                {t?.roomChat.yourChats || "Percakapan Anda"}
               </Text>
 
               {filteredConversations.map((item, index) => (

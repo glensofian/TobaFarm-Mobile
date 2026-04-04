@@ -13,6 +13,7 @@ import {
   View,
 } from 'react-native';
 import { ComponentStyles, ComponentTextStyles } from '../styles';
+import { useLanguage } from '../context/LanguageContext';
 
 type ChangePasswordModalProps = {
   visible: boolean;
@@ -25,6 +26,7 @@ export default function ChangePasswordModal({
   onClose,
   onSubmit,
 }: ChangePasswordModalProps) {
+  const { t } = useLanguage();
   const [oldPassword, setOldPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -34,24 +36,24 @@ export default function ChangePasswordModal({
 
   const handleSave = async () => {
     if (!oldPassword || !newPassword || !confirmPassword) {
-      Alert.alert("Input Tidak Lengkap", "Harap isi semua field password.");
+      Alert.alert(t.changePassword.title, t.changePassword.errFormIncomplete);
       return;
     }
     if (newPassword !== confirmPassword) {
-      Alert.alert("Password Tidak Cocok", "Konfirmasi password baru tidak sesuai.");
+      Alert.alert(t.changePassword.title, t.changePassword.errFormIncomplete);
       return;
     }
 
     try {
       setLoading(true);
       await onSubmit(oldPassword, newPassword);
-      Alert.alert("Berhasil", "Kata sandi Anda telah diperbarui.");
+      Alert.alert(t.changePassword.title, t.changePassword.success);
       onClose();
       setOldPassword('');
       setNewPassword('');
       setConfirmPassword('');
     } catch (e: any) {
-      Alert.alert("Gagal", e.message || "Gagal mengubah kata sandi.");
+      Alert.alert(t.changePassword.title, e.message || "Error");
     } finally {
       setLoading(false);
     }
@@ -74,7 +76,7 @@ export default function ChangePasswordModal({
           <Pressable style={ComponentStyles.changePassPressableOverlay} onPress={onClose}>
             <View style={ComponentStyles.changePassContainer} onStartShouldSetResponder={() => true}>
               <View style={ComponentStyles.changePassHeader}>
-                <Text style={ComponentTextStyles.changePassHeaderTitle}>Ganti Kata Sandi</Text>
+                <Text style={ComponentTextStyles.changePassHeaderTitle}>{t.changePassword.title}</Text>
               </View>
 
               <ScrollView
@@ -83,7 +85,7 @@ export default function ChangePasswordModal({
               >
                 {/* Kata Sandi Lama */}
                 <View style={ComponentStyles.changePassField}>
-                  <Text style={ComponentTextStyles.changePassLabel}>Kata Sandi Lama</Text>
+                  <Text style={ComponentTextStyles.changePassLabel}>{t.changePassword.oldPassword}</Text>
                   <View style={ComponentStyles.changePassInputWrapper}>
                     <TextInput
                       style={ComponentStyles.changePassInput}
@@ -101,7 +103,7 @@ export default function ChangePasswordModal({
 
                 {/* Kata Sandi Baru */}
                 <View style={ComponentStyles.changePassField}>
-                  <Text style={ComponentTextStyles.changePassLabel}>Kata Sandi Baru</Text>
+                  <Text style={ComponentTextStyles.changePassLabel}>{t.changePassword.newPassword}</Text>
                   <View style={ComponentStyles.changePassInputWrapper}>
                     <TextInput
                       style={ComponentStyles.changePassInput}
@@ -119,7 +121,7 @@ export default function ChangePasswordModal({
 
                 {/* Konfirmasi Kata Sandi Baru */}
                 <View style={ComponentStyles.changePassField}>
-                  <Text style={ComponentTextStyles.changePassLabel}>Konfirmasi Kata Sandi Baru</Text>
+                  <Text style={ComponentTextStyles.changePassLabel}>{t.changePassword.confirmPassword}</Text>
                   <View style={ComponentStyles.changePassInputWrapper}>
                     <TextInput
                       style={ComponentStyles.changePassInput}
@@ -139,7 +141,7 @@ export default function ChangePasswordModal({
                     onPress={onClose}
                     disabled={loading}
                   >
-                    <Text style={ComponentTextStyles.changePassBtnCancelText}>Batal</Text>
+                    <Text style={ComponentTextStyles.changePassBtnCancelText}>{t.changePassword.cancel}</Text>
                   </TouchableOpacity>
 
                   <TouchableOpacity
@@ -147,7 +149,7 @@ export default function ChangePasswordModal({
                     onPress={handleSave}
                     disabled={loading}
                   >
-                    <Text style={ComponentTextStyles.changePassBtnSaveText}>{loading ? "Menyimpan..." : "Simpan"}</Text>
+                    <Text style={ComponentTextStyles.changePassBtnSaveText}>{loading ? t.roomChat.syncing : t.changePassword.save}</Text>
                   </TouchableOpacity>
                 </View>
                 <View style={{ height: 40 }} />

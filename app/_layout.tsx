@@ -2,6 +2,7 @@ import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
 import { ActivityIndicator, View } from 'react-native';
 import { NetworkProvider } from '../context/NetworkContext';
+import { LanguageProvider } from '../context/LanguageContext';
 
 export default function Layout() {
   // Load font aplikasi
@@ -26,13 +27,15 @@ export default function Layout() {
 
   // Root navigation untuk seluruh halaman aplikasi
   return (
-    <NetworkProvider>
-      <Stack
-        screenOptions={{
-          headerShown: false,
-          animation: 'slide_from_right',
-        }}
-      />
-    </NetworkProvider>
+    <LanguageProvider>
+      <NetworkProvider>
+        <Stack
+          screenOptions={{
+            headerShown: false,
+            animation: 'slide_from_right',
+          }}
+        />
+      </NetworkProvider>
+    </LanguageProvider>
   );
 }

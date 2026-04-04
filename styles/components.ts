@@ -510,6 +510,32 @@ export const ComponentStyles = StyleSheet.create({
     minWidth: 80,
     alignItems: 'center',
   },
+  settingsLangDropdownMenu: {
+    position: 'absolute',
+    top: 40,
+    right: 0,
+    backgroundColor: Colors.white,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    width: 140,
+    overflow: 'hidden',
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    zIndex: 100,
+  },
+  settingsLangDropdownItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F5F5F5',
+  },
 
   /* ===== CHANGE PASSWORD MODAL ===== */
   changePassOverlay: {
@@ -792,6 +818,11 @@ export const ComponentTextStyles = StyleSheet.create({
   settingsActionText: {
     fontSize: 14,
     fontFamily: 'Montserrat-Bold',
+    color: Colors.black,
+  },
+  settingsLangDropdownText: {
+    fontSize: 14,
+    fontFamily: 'Montserrat-Regular',
     color: Colors.black,
   },
   settingsChangePassText: {

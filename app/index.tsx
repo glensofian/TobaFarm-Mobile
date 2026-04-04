@@ -12,6 +12,7 @@ import { useRouter } from "expo-router";
 import { useMemo, useState, useEffect } from "react";
 import LoginButton from "../components/LoginButton";
 import ChatInput from "../components/ChatInput";
+import { useLanguage } from "../context/LanguageContext";
 import {
   Colors,
   Typography,
@@ -24,6 +25,7 @@ import { createConversationsApi } from "../api/conversationsApi";
 
 export default function Home() {
   const router = useRouter();
+  const { t } = useLanguage();
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [username, setUsername] = useState("");
 
@@ -60,15 +62,15 @@ export default function Home() {
     const hour = new Date().getHours();
 
     if (hour >= 4 && hour < 11) {
-      return "Selamat Pagi";
+      return t.landing.greetingMorning;
     } else if (hour >= 11 && hour < 15) {
-      return "Selamat Siang";
+      return t.landing.greetingAfternoon;
     } else if (hour >= 15 && hour < 18) {
-      return "Selamat Sore";
+      return t.landing.greetingEvening;
     } else {
-      return "Selamat Malam";
+      return t.landing.greetingNight;
     }
-  }, []);
+  }, [t.landing]);
 
   return (
     <SafeAreaView
@@ -96,13 +98,13 @@ export default function Home() {
               <Text
                 style={[Typography.greeting, ComponentTextStyles.homeGreeting]}
               >
-                Halo{isLoggedIn ? `, ${username}` : ''}. {greeting}
+                {t.landing.greeting}{isLoggedIn ? `, ${username}` : ''}. {greeting}
               </Text>
 
               <Text
                 style={[Typography.question, ComponentTextStyles.homeQuestion]}
               >
-                Apa yang boleh saya bantu ?
+                {t.landing.helpText}
               </Text>
 
               <ChatInput
