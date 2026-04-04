@@ -25,7 +25,7 @@ import { createConversationsApi } from '@/api/conversationsApi';
 import { ChatRepository } from '../data/repositories/ChatRepository';
 import { MODEL_CONFIG } from '../constants/modelConfig';
 import { models } from '../constants/models';
-import { getValueFor } from '@/utils/storage';
+import { getValueFor, removeValueFor, save } from '@/utils/storage';
 import { nowIso } from '@/utils/date';
 import { uid } from '@/utils/uid';
 import { truncateTitle } from '@/utils/truncateTitle';
@@ -111,6 +111,7 @@ export type ChatContextValue = {
   handleLoadConversations: () => Promise<void>;
   handleLoadMessages: (conversationId: string) => Promise<void>;
   handleStop: () => void;
+  handleClearAllChats: () => Promise<void>;
 
   /* Sync & Status */
   isSyncing: boolean;
@@ -210,7 +211,35 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
   /* --- Data Persistence --- */
   const [conversations, setConversations] = useState<GlobalConversation[]>([]);
   const [activeConversationId, setActiveConversationId] = useState("");
+
+  // --- Persistence: Load last conversation ID on mount ---
+  useEffect(() => {
+    async function loadLastId() {
+      const lastId = await getValueFor("lastConversationId");
+      if (lastId) {
+        setActiveConversationId(lastId);
+      }
+    }
+    loadLastId();
+  }, []);
+
+  // --- Persistence: Save active ID whenever it changes ---
+  useEffect(() => {
+    if (activeConversationId) {
+      save("lastConversationId", activeConversationId);
+    } else {
+      removeValueFor("lastConversationId");
+    }
+  }, [activeConversationId]);
+
   const [messagesByConversation, setMessagesByConversation] = useState<Record<string, GlobalMessage[]>>({});
+  
+  // Ref untuk melacak state pesan terbaru
+  const messagesRef = useRef<Record<string, GlobalMessage[]>>({});
+  useEffect(() => {
+    messagesRef.current = messagesByConversation;
+  }, [messagesByConversation]);
+
   const [isDataLoaded, setIsDataLoaded] = useState(false);
 
   /* --- Input & Sending --- */
@@ -306,16 +335,37 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
 
   const handleLoadConversations = useCallback(async () => {
     try {
+      let combined: GlobalConversation[] = [];
       if (isInternetReachable) {
-        const remote = await api.loadConversations();
-        setConversations(remote);
+        combined = await api.loadConversations();
       } else {
         const local = await ChatRepository.getAllConversations();
-        setConversations(local.map(dbToGlobalConversation));
+        combined = local.map(dbToGlobalConversation);
       }
+      
+      setConversations(prev => {
+        const tempConvs = prev.filter(c => c.id.startsWith("temp-"));
+        const merged = [...tempConvs];
+        combined.forEach(ext => {
+           if (!merged.find(m => m.id === ext.id)) {
+              merged.push(ext);
+           }
+        });
+        return merged;
+      });
     } catch (e) {
       const local = await ChatRepository.getAllConversations();
-      setConversations(local.map(dbToGlobalConversation));
+      setConversations(prev => {
+        const tempConvs = prev.filter(c => c.id.startsWith("temp-"));
+        const localMapped = local.map(dbToGlobalConversation);
+        const merged = [...tempConvs];
+        localMapped.forEach(ext => {
+           if (!merged.find(m => m.id === ext.id)) {
+              merged.push(ext);
+           }
+        });
+        return merged;
+      });
     } finally {
       setIsDataLoaded(true);
     }
@@ -323,6 +373,13 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
 
   const handleLoadMessages = useCallback(async (cid: string) => {
     if (!cid) return;
+    
+    const existing = messagesRef.current[cid];
+    if (existing && existing.length > 0) {
+      console.log("[ChatContext] Skip handleLoadMessages (data exists locally):", cid);
+      return;
+    }
+
     try {
       if (isInternetReachable && !cid.startsWith("temp-")) {
         const history = await api.fetchMessages(cid);
@@ -388,6 +445,28 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
 
       const isOffline = selectedModel === 'tofa-offline';
 
+      const saveToApi = async (id: string, retryCount = 0) => {
+        if (id.startsWith("temp-")) {
+          const realId = tempIdMapRef.current[id];
+          if (realId) {
+            id = realId;
+          } else if (retryCount < 5) {
+            setTimeout(() => saveToApi(id, retryCount + 1), 300);
+            return;
+          } else {
+            console.warn("[ChatContext] Giving up saving to API: ID is still temporary after retries.");
+            return;
+          }
+        }
+
+        await api.saveMessage(id, "assistant", fullText).then(() => {
+          console.log("[ChatContext] AI Response Saved to API (Done):", id);
+        }).catch((err) => {
+          console.error("[ChatContext] Failed to save AI response:", err);
+          hasSavedResponseRef.current = false;
+        });
+      };
+
       if (isOffline) {
         await ChatRepository.saveMessage({
           conversation_id: targetId,
@@ -395,10 +474,9 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
           content: fullText,
           is_synced: false
         });
+        console.log("[ChatContext] AI Response Saved Offline (Done)");
       } else {
-        await api.saveMessage(targetId, "assistant", fullText).catch(() => {
-          hasSavedResponseRef.current = false;
-        });
+        await saveToApi(targetId);
       }
     } catch (e) {
       console.error("Save assistant message error:", e);
@@ -500,7 +578,11 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
           tempIdMapRef.current[oldTempId] = realId; 
 
           setConversations((prev) =>
-            prev.map((c) => (c.id === oldTempId ? { ...c, id: realId, title: generatedTitle } : c))
+            prev.map((c) => 
+              (c.id === oldTempId || c.id === realId) 
+                ? { ...c, id: realId, title: generatedTitle } 
+                : c
+            )
           );
           setMessagesByConversation((prev) => {
             const { [oldTempId]: m, ...rest } = prev;
@@ -510,7 +592,9 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
           threadId = realId;
           setActiveConversationId(realId);
 
-          api.renameConversation(realId, generatedTitle).catch(() => {});
+          api.renameConversation(realId, generatedTitle).catch(err => {
+            console.warn("[ChatContext] Failed renaming on server:", err);
+          });
           api.saveMessage(realId, "user", text).catch(() => {});
         }
       } catch (e) {
@@ -518,13 +602,20 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
       }
     } else if (!isNewChat && !isOffline) {
       api.saveMessage(threadId, "user", text).catch(() => {});
-      const currentConv = conversations.find(c => c.id === threadId);
-      if (currentConv && (currentConv.title === "Percakapan Baru" || currentConv.title === "Untitled")) {
-        api.renameConversation(threadId, generatedTitle).catch(() => {});
-        setConversations((prev) =>
-          prev.map((c) => c.id === threadId ? { ...c, title: generatedTitle } : c)
-        );
-      }
+      
+      setConversations((prev) => {
+        const targetIdx = prev.findIndex(c => c.id === threadId);
+        if (targetIdx !== -1) {
+          const target = prev[targetIdx];
+          if (target.title === "Percakapan Baru" || target.title === "Untitled" || !target.title) {
+            api.renameConversation(threadId, generatedTitle).catch(() => {});
+            const updated = [...prev];
+            updated[targetIdx] = { ...target, title: generatedTitle };
+            return updated;
+          }
+        }
+        return prev;
+      });
     }
   }, [activeConversationId, input, isSending, selectedModel, isOfflineModelDownloaded, api, ws, conversations]);
 
@@ -545,8 +636,25 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
         await api.deleteConversation(id);
       }
       await ChatRepository.deleteConversation(id);
-      setConversations(prev => prev.filter(c => c.id !== id));
-      if (activeConversationId === id) setActiveConversationId("");
+      
+      const remaining = conversations.filter(c => c.id !== id);
+      setConversations(remaining);
+
+      // Kosongkan pesan di UI segera agar terasa "terhapus" seketika
+      setMessagesByConversation(prev => {
+        const next = { ...prev };
+        delete next[id];
+        return next;
+      });
+      
+      if (activeConversationId === id) {
+        if (remaining.length === 0) {
+          setTimeout(() => router.replace("/"), 300);
+        } else {
+          setActiveConversationId("");
+        }
+      }
+      setSidebarOpen(false); 
     } catch (e) {
       Alert.alert("Gagal Menghapus", "Terjadi kesalahan saat menghapus percakapan.");
     }
@@ -569,6 +677,26 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     ws.stop();
     setIsSending(false);
   }, [ws]);
+
+  const handleClearAllChats = useCallback(async () => {
+    try {
+      if (isInternetReachable) {
+        await api.clearAllChats();
+      }
+      await ChatRepository.deleteSyncedConversations();
+      await ChatRepository.deleteSyncedMessages();
+      
+      setConversations([]);
+      setMessagesByConversation({});
+      setActiveConversationId("");
+      removeValueFor("lastConversationId");
+      setSidebarOpen(false); 
+      
+      setTimeout(() => router.replace("/"), 300);
+    } catch (e) {
+      Alert.alert("Gagal Menghapus", "Terjadi kesalahan saat menghapus semua percakapan.");
+    }
+  }, [api, isInternetReachable, router]);
 
   const filteredConversations = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
@@ -621,6 +749,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
         handleLoadConversations,
         handleLoadMessages,
         handleStop,
+        handleClearAllChats,
         isSyncing,
         wsStatus: ws.status,
       }}

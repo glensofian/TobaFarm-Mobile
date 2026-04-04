@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
   Text,
@@ -25,12 +25,13 @@ import { translations } from '../constants/i18n/translations';
 // --- Inner component { Context } ---
 
 function RoomChatInner() {
+  const router = useRouter();
   const { prompt } = useLocalSearchParams<{ prompt?: string }>();
   const insets = useSafeAreaInsets();
   
   // --- State Keyboard visibility ---
   const [isKeyboardVisible, setKeyboardVisible] = useState(false);
-  const t = translations['id']; // Default to Indonesian
+  const t = translations['id'];
   
   useEffect(() => {
     const showEvent = Platform.OS === 'android' ? 'keyboardDidShow' : 'keyboardWillShow';
@@ -65,6 +66,7 @@ function RoomChatInner() {
     handleNewChat,
     handleDeleteConversation,
     handleRenameConversation,
+    handleClearAllChats,
     isSyncing,
     wsStatus,
   } = useChat();
@@ -75,12 +77,10 @@ function RoomChatInner() {
   useEffect(() => {
     const isReady = wsStatus === 'open' || selectedModel === 'tofa-offline';
     if (prompt && activeMessagesUI.length === 0 && isReady && !isSending) {
-      const timer = setTimeout(() => {
-        onSend(undefined, prompt as string, true);
-      }, 200);
-      return () => clearTimeout(timer);
+      onSend(undefined, prompt as string, true);
+      router.setParams({ prompt: undefined });
     }
-  }, [prompt, wsStatus, selectedModel, activeMessagesUI.length, isSending]);
+  }, [prompt, wsStatus, selectedModel, activeMessagesUI.length, isSending, onSend, router]);
 
   return (
     <SafeAreaView
@@ -273,6 +273,7 @@ function RoomChatInner() {
         setSidebarCollapsed={() => {}}
         onOpenRename={handleRenameConversation}
         onNewChat={handleNewChat}
+        onClearAll={handleClearAllChats}
         conversations={filteredConversations}
         activeConversationId={activeConversationId}
         setActiveConversationId={setActiveConversationId}
@@ -284,7 +285,6 @@ function RoomChatInner() {
         filteredConversations={filteredConversations}
         openMenuId={openMenuId}
         setOpenMenuId={(fn: any) => setOpenMenuId(fn)}
-        onClearAll={() => {}}
         onOpenSettings={() => {}}
       />
 
