@@ -67,9 +67,9 @@ export default function ChangePasswordModal({
     >
       <View style={styles.overlay}>
         <KeyboardAvoidingView
-          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          behavior={Platform.OS === "ios" ? "padding" : "padding"}
           style={styles.keyboardView}
-          keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 20}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : -100}
         >
           <Pressable style={styles.pressableOverlay} onPress={onClose}>
             <View style={styles.modalContainer} onStartShouldSetResponder={() => true}>
@@ -167,13 +167,13 @@ const styles = StyleSheet.create({
   },
   keyboardView: {
     width: '100%',
-    height: '100%',
+    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
   pressableOverlay: {
     width: '100%',
-    height: '100%',
+    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
@@ -181,7 +181,7 @@ const styles = StyleSheet.create({
   modalContainer: {
     width: '100%',
     maxWidth: 400,
-    maxHeight: '90%',
+    maxHeight: '80%',
     backgroundColor: '#F5F5F5',
     borderRadius: 20,
     overflow: 'hidden',
@@ -190,6 +190,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 10,
+    flexShrink: 1,
   },
   header: {
     paddingHorizontal: 20,

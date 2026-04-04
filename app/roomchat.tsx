@@ -233,7 +233,7 @@ function RoomChatInner() {
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === "ios" ? "padding" : "padding"}
-        enabled={Platform.OS === "ios" || (isKeyboardVisible && !sidebarOpen)}
+        enabled={Platform.OS === "ios" || (isKeyboardVisible && !sidebarOpen && !settingsVisible && !changePasswordVisible)}
       >
         {activeConversationId || prompt ? (
           <>
