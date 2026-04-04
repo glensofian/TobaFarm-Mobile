@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useState } from 'react';
 import {
   Alert,
-  KeyboardAvoidingView,
+  Keyboard,
   Modal,
   Platform,
   Pressable,
@@ -49,6 +49,12 @@ export default function SettingsModal({
   const selectLanguage = (lang: Language) => {
     setLanguage(lang);
     setIsLangDropdownOpen(false);
+    Keyboard.dismiss();
+  };
+
+  const handleOpenDropdown = () => {
+    Keyboard.dismiss();
+    setIsLangDropdownOpen(!isLangDropdownOpen);
   };
 
   return (
@@ -82,7 +88,7 @@ export default function SettingsModal({
                   <View style={{ flex: 1, alignItems: 'flex-end' }}>
                     <TouchableOpacity 
                       style={ComponentStyles.settingsDropdownBtn} 
-                      onPress={() => setIsLangDropdownOpen(!isLangDropdownOpen)}
+                      onPress={handleOpenDropdown}
                     >
                       <Text style={ComponentTextStyles.settingsDropdownText}>
                           {language === 'id' ? t.settings.indonesian : t.settings.english}
@@ -123,15 +129,16 @@ export default function SettingsModal({
                 </View>
 
                 {/* Nama Panggilan */}
-                <View style={ComponentStyles.settingsRow}>
+                <View style={[ComponentStyles.settingsRow, { zIndex: 1 }]}>
                   <Text style={ComponentTextStyles.settingsLabel}>{t.settings.nicknameLabel}</Text>
                   <TextInput
                     style={ComponentStyles.settingsInput}
-                    value={nickname} // Gunakan state nickname langsung tanpa || username
+                    value={nickname}
                     onChangeText={setNickname}
-                    placeholder={username || t.settings.nicknamePlaceholder} // Username tetap ada sebagai bayangan (placeholder)
+                    placeholder={username || t.settings.nicknamePlaceholder}
                     placeholderTextColor="#999"
                     selectTextOnFocus={true}
+                    editable={!isLangDropdownOpen}
                   />
                 </View>
 

@@ -12,7 +12,7 @@ export const settingsTranslation: Record<
     appSection: "Aplikasi",
     languageLabel: "Bahasa",
     indonesian: "Indonesia",
-    english: "Inggris",
+    english: "English",
     clearHistoryLabel: "Hapus Semua Chat",
     clearHistoryConfirm: "Semua riwayat percakapan akan dihapus secara permanen. Lanjutkan?",
     logoutLabel: "Keluar Akun",
