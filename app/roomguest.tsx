@@ -91,10 +91,12 @@ function RoomGuestInner() {
       {/* ===== HEADER ===== */}
       <View style={[ComponentStyles.roomChatHeader, { height: 60, zIndex: 20 }]}>
         {/* Left spacer for symmetry */}
-        <View style={{ width: 60 }} />
+        <View style={{ flex: 1 }}>
+          {/* Branding if needed or just empty for balance */}
+        </View>
 
         {/* Center Title & Model Dropdown */}
-        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+        <View style={{ flex: 2, alignItems: 'center', justifyContent: 'center' }}>
           <TouchableOpacity
             onPress={() => setIsDropdownOpen(!isDropdownOpen)}
             style={{ alignItems: 'center' }}
@@ -103,14 +105,25 @@ function RoomGuestInner() {
               TobaFarm
             </Text>
             <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: -2 }}>
+              {selectedModel !== 'tofa-offline' && (
+                <View 
+                  style={{ 
+                    width: 6, 
+                    height: 6, 
+                    borderRadius: 3, 
+                    backgroundColor: '#4ade80', 
+                    marginRight: 4 
+                  }} 
+                />
+              )}
               <Text style={{ 
-                color: 'rgba(255,255,255,0.7)', 
+                color: selectedModel === 'tofa-offline' ? 'rgba(255,255,255,0.7)' : '#4ade80', 
                 fontSize: 10, 
                 fontFamily: 'Montserrat-Medium' 
               }}>
                 {selectedModel === 'tofa-offline' ? t.roomChat.offlineMode : t.roomChat.onlineMode}
               </Text>
-              <Ionicons name={isDropdownOpen ? "chevron-up" : "chevron-down"} size={10} color="rgba(255,255,255,0.7)" style={{ marginLeft: 4 }} />
+              <Ionicons name={isDropdownOpen ? "chevron-up" : "chevron-down"} size={10} color={selectedModel === 'tofa-offline' ? "rgba(255,255,255,0.7)" : "#4ade80"} style={{ marginLeft: 4 }} />
             </View>
           </TouchableOpacity>
 
@@ -178,14 +191,16 @@ function RoomGuestInner() {
         </View>
 
         {/* Login button */}
-        <View style={{ width: 60, alignItems: 'flex-end' }}>
+        <View style={{ flex: 1, alignItems: 'flex-end' }}>
           <TouchableOpacity
             onPress={() => router.push('/login')}
             style={{
               backgroundColor: Colors.white,
-              paddingHorizontal: 12,
+              paddingHorizontal: 16,
               paddingVertical: 5,
               borderRadius: 15,
+              minWidth: 70, // Added minWidth to prevent text wrapping
+              alignItems: 'center',
             }}
           >
             <Text
