@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useState } from 'react';
 import {
+  Alert,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -97,7 +98,19 @@ export default function SettingsModal({
                 {/* Hapus Semua Chat */}
                 <View style={styles.settingRow}>
                   <Text style={styles.label}>Hapus Semua Chat</Text>
-                  <TouchableOpacity style={styles.actionBtn} onPress={onClearAll}>
+                  <TouchableOpacity 
+                    style={styles.actionBtn} 
+                    onPress={() => {
+                        Alert.alert(
+                          "Hapus Semua Chat",
+                          "Apakah Anda yakin ingin menghapus seluruh riwayat percakapan? Tindakan ini tidak dapat dibatalkan.",
+                          [
+                            { text: "Batal", style: "cancel" },
+                            { text: "Hapus", style: "destructive", onPress: onClearAll }
+                          ]
+                        );
+                    }}
+                  >
                     <Text style={[styles.actionText, { color: '#D32F2F' }]}>Hapus</Text>
                     <Ionicons name="trash-outline" size={18} color="#D32F2F" style={{ marginLeft: 6 }} />
                   </TouchableOpacity>

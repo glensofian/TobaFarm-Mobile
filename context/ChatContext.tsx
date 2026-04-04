@@ -724,6 +724,14 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     setSidebarOpen(false);
     await removeValueFor("token");
     await removeValueFor("user");
+    await removeValueFor("lastConversationId");
+    
+    // Clear local states
+    setUser(null);
+    setConversations([]);
+    setMessagesByConversation({});
+    setActiveConversationId("");
+
     router.replace("/");
   }, [router]);
 

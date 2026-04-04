@@ -140,7 +140,7 @@ function RoomChatInner() {
               </View>
 
               {/* Online Models */}
-              {[{ id: 'tofa-lite', label: 'ToFa Lite' }, { id: 'tofa-pro', label: 'ToFa Pro' }].map((model) => (
+              {[{ id: 'tofa-lite', label: 'ToFa Lite' }, { id: 'tofa-pro', label: 'ToFa Pro' }, { id: 'tofa-ultra', label: 'ToFa Ultra' }].map((model) => (
                 <TouchableOpacity
                   key={model.id}
                   onPress={() => {
