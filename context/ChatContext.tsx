@@ -18,6 +18,7 @@ import { Alert, Keyboard } from 'react-native';
 
 import { useSyncChat } from '../hooks/useSyncChat';
 import { useWebSocketChat } from '../hooks/useWebSocketChat';
+import { useLanguage } from './LanguageContext';
 import { useNetwork } from './NetworkContext';
 
 import { changePassword, updateNickname } from '@/api/authApi';
@@ -174,7 +175,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
   /* --- Model State --- */
   const [modelsModalVisible, setModelsModalVisible] = useState(false);
   const [downloadModelVisible, setDownloadModelVisible] = useState(false);
-  const [selectedModel, setSelectedModel] = useState<string>(models[0].id);
+  const [selectedModel, setSelectedModelRaw] = useState<string>(models[0].id);
   const [isOfflineModelDownloaded, setIsOfflineModelDownloaded] = useState(false);
 
   /* --- Network --- */
@@ -251,6 +252,21 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
 
   /* --- Notification --- */
   const [notification, setNotification] = useState<ChatNotification>(null);
+  const { t } = useLanguage();
+
+  const setSelectedModel = useCallback((m: string) => {
+    if (isSending) {
+      const currentModel = models.find(mod => mod.id === selectedModel);
+      const modelLabel = currentModel ? currentModel.label : selectedModel;
+      
+      setNotification({
+        title: t.roomChat.modelAnsweringTitle || "Sedang Menjawab",
+        message: `"${modelLabel}" ${t.roomChat.modelAnsweringMessage || "sedang menjawab, harap tunggu hingga selesai."}`
+      });
+      return;
+    }
+    setSelectedModelRaw(m);
+  }, [isSending, selectedModel, t]);
 
   /* --- Refs for flow control --- */
   const tempIdMapRef = useRef<Record<string, string>>({});
@@ -647,12 +663,12 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
       setConversations((prev) => {
         const next = prev.filter(c => c.id !== id);
 
-        if (activeConversationId === id) {
-          if (next.length === 0) {
-            setTimeout(() => router.replace("/"), 300);
-          } else {
-            setActiveConversationId("");
-          }
+        if (next.length === 0) {
+          setTimeout(() => router.replace("/"), 300);
+          setActiveConversationId("");
+          setSidebarOpen(false);
+        } else if (activeConversationId === id) {
+          setActiveConversationId("");
           setSidebarOpen(false);
         }
         return next;

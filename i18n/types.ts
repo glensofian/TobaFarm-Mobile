@@ -37,6 +37,8 @@ export interface RoomChatTranslation {
   login: string;
   noInternet: string;
   checkConnection: string;
+  modelAnsweringTitle: string;
+  modelAnsweringMessage: string;
 }
 
 export interface SettingsTranslation {

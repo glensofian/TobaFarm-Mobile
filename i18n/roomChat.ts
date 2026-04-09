@@ -27,6 +27,8 @@ export const roomChatTranslation: Record<
     login: "Masuk",
     noInternet: "Tidak Ada Internet",
     checkConnection: "Harap periksa koneksi internet Anda",
+    modelAnsweringTitle: "Sedang Menjawab",
+    modelAnsweringMessage: "sedang menjawab, harap tunggu hingga selesai.",
   },
 
   en: {
@@ -52,5 +54,7 @@ export const roomChatTranslation: Record<
     login: "Login",
     noInternet: "No Internet",
     checkConnection: "Please check your internet connection",
+    modelAnsweringTitle: "Answering",
+    modelAnsweringMessage: "is answering, please wait until finished.",
   },
 };
