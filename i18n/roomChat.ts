@@ -29,6 +29,12 @@ export const roomChatTranslation: Record<
     checkConnection: "Harap periksa koneksi internet Anda",
     modelAnsweringTitle: "Sedang Menjawab",
     modelAnsweringMessage: "sedang menjawab, harap tunggu hingga selesai.",
+    offlineSwitchTitle: "Mode Offline",
+    offlineSwitchMessage: "Beralih ke mode offline otomatis. Periksa koneksi internet Anda.",
+    offlineNotDownloadedTitle: "Mode Offline Tidak Tersedia",
+    offlineNotDownloadedMessage: "Model Offline belum terinstall, silakan sambungkan koneksi dan unduh terlebih dahulu.",
+    onlineSwitchTitle: "Mode Online",
+    onlineSwitchMessage: "Beralih kembali ke mode online.",
   },
 
   en: {
@@ -56,5 +62,11 @@ export const roomChatTranslation: Record<
     checkConnection: "Please check your internet connection",
     modelAnsweringTitle: "Answering",
     modelAnsweringMessage: "is answering, please wait until finished.",
+    offlineSwitchTitle: "Offline Mode",
+    offlineSwitchMessage: "Switched to offline mode automatically. Please check your connection.",
+    offlineNotDownloadedTitle: "Offline Mode Unavailable",
+    offlineNotDownloadedMessage: "Offline model is not installed. Please connect to the internet and download it first.",
+    onlineSwitchTitle: "Online Mode",
+    onlineSwitchMessage: "Switched back to online mode.",
   },
 };

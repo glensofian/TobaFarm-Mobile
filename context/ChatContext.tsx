@@ -272,6 +272,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
   const tempIdMapRef = useRef<Record<string, string>>({});
   const lastSavedTextRef = useRef<string>("");
   const hasSavedResponseRef = useRef<boolean>(false);
+  const deletedConvsRef = useRef<Set<string>>(new Set());
 
   // --- Typing animation
   useEffect(() => {
@@ -301,6 +302,46 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     checkOfflineModel();
   }, [checkOfflineModel]);
+
+  // --- Auto-switch offline/online mode based on network ---
+  const prevInternetReachable = useRef<boolean | null>(null);
+
+  useEffect(() => {
+    if (prevInternetReachable.current === null) {
+      if (isInternetReachable !== null) {
+        prevInternetReachable.current = isInternetReachable;
+      }
+      return;
+    }
+
+    if (isInternetReachable === false && prevInternetReachable.current === true) {
+      if (isOfflineModelDownloaded) {
+        setSelectedModelRaw('tofa-offline');
+        setNotification({
+          title: (t.roomChat as any).offlineSwitchTitle || "Mode Offline",
+          message: (t.roomChat as any).offlineSwitchMessage || "Beralih ke mode offline otomatis. Periksa koneksi internet Anda.",
+        });
+      } else {
+        setNotification({
+          title: (t.roomChat as any).offlineNotDownloadedTitle || "Mode Offline Tidak Tersedia",
+          message: (t.roomChat as any).offlineNotDownloadedMessage || "Model Offline belum terinstall, silakan sambungkan koneksi dan unduh terlebih dahulu.",
+        });
+      }
+    } else if (isInternetReachable === true && prevInternetReachable.current === false) {
+      setNotification({
+        title: (t.roomChat as any).onlineSwitchTitle || "Mode Online",
+        message: (t.roomChat as any).onlineSwitchMessage || "Beralih kembali ke mode online.",
+      });
+
+      if (selectedModel === 'tofa-offline') {
+        setSelectedModelRaw(models[0].id);
+      }
+    }
+
+    if (isInternetReachable !== null) {
+      prevInternetReachable.current = isInternetReachable;
+    }
+  }, [isInternetReachable, isOfflineModelDownloaded, selectedModel, t]);
 
   const handleDeleteOfflineModel = useCallback(() => {
     Alert.alert(
@@ -356,6 +397,20 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
       let combined: GlobalConversation[] = [];
       if (isInternetReachable) {
         combined = await api.loadConversations();
+        // Cache internally for offline availability
+        try {
+          for (const c of combined) {
+            await ChatRepository.saveConversation({
+              id: c.id,
+              title: c.title,
+              created_at: new Date(c.createdAt).getTime(),
+              is_synced: true,
+              server_id: c.id
+            });
+          }
+        } catch (e) {
+          console.warn("Failed caching conversations:", e);
+        }
       } else {
         const local = await ChatRepository.getAllConversations();
         combined = local.map(dbToGlobalConversation);
@@ -402,6 +457,25 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
       if (isInternetReachable && !cid.startsWith("temp-")) {
         const history = await api.fetchMessages(cid);
         setMessagesByConversation(prev => ({ ...prev, [cid]: history }));
+        
+        // Cache internally for offline availability
+        try {
+          for (const m of history) {
+            await ChatRepository.saveMessage({
+              id: m.id,
+              conversation_id: cid,
+              role: m.role === 'bot' ? 'assistant' : 'user',
+              content: m.text,
+              created_at: new Date(m.createdAt).getTime(),
+              is_synced: true,
+              server_id: m.id
+            });
+          }
+          // Only keep messages locally for the active chat
+          await ChatRepository.purgeOldSyncedMessages(cid);
+        } catch (e) {
+          console.warn("Failed caching messages:", e);
+        }
       } else {
         const history = await ChatRepository.getMessagesByConversation(cid);
         setMessagesByConversation(prev => ({ ...prev, [cid]: history.map(dbToGlobalMessage) }));
@@ -426,6 +500,8 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
   const onWsToken = useCallback((cid: string, token: string) => {
     setIsSending(true);
     const realId = tempIdMapRef.current[cid] || cid;
+
+    if (deletedConvsRef.current.has(realId)) return;
 
     setMessagesByConversation((prev) => {
       const threadMsgs = prev[realId] ?? [];
@@ -452,7 +528,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
 
   const onWsDone = useCallback(async (cid: string, fullText: string) => {
     const targetId = tempIdMapRef.current[cid] || cid;
-    if (!targetId) return;
+    if (!targetId || deletedConvsRef.current.has(targetId)) return;
 
     try {
       if (!fullText || hasSavedResponseRef.current) return;
@@ -473,15 +549,44 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
             return;
           } else {
             console.warn("[ChatContext] Giving up saving to API: ID is still temporary after retries.");
+            hasSavedResponseRef.current = false;
+            try {
+              await ChatRepository.saveMessage({
+                conversation_id: targetId,
+                role: 'assistant',
+                content: fullText,
+                is_synced: false
+              });
+              console.log("[ChatContext] AI partial response saved offline due to giveup.");
+            } catch (e) {}
             return;
           }
         }
 
-        await api.saveMessage(id, "assistant", fullText).then(() => {
+        await api.saveMessage(id, "assistant", fullText).then(async () => {
           console.log("[ChatContext] AI Response Saved to API (Done):", id);
-        }).catch((err) => {
-          console.error("[ChatContext] Failed to save AI response:", err);
+          // CACHE LOCALLY SO IT'S VISIBLE OFFLINE!
+          try {
+            await ChatRepository.saveMessage({
+              conversation_id: id,
+              role: 'assistant',
+              content: fullText,
+              is_synced: true,
+              server_id: id 
+            });
+          } catch (e) {}
+        }).catch(async (err) => {
+          console.error("[ChatContext] Failed to save AI response to API, falling back locally:", err);
           hasSavedResponseRef.current = false;
+          try {
+            await ChatRepository.saveMessage({
+              conversation_id: id,
+              role: 'assistant',
+              content: fullText,
+              is_synced: false
+            });
+            console.log("[ChatContext] AI response saved offline in catch fallback.");
+          } catch (e) {}
         });
       };
 
@@ -550,17 +655,17 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
         ...prev,
       ]);
 
-      if (isOffline) {
-        try {
-          await ChatRepository.saveConversation({
-            id: threadId,
-            title: generatedTitle,
-            created_at: Date.now(),
-            is_synced: false
-          });
-        } catch (err) {
-          console.error("Failed save local chat:", err);
-        }
+      // Always save new conversation locally just in case internet drops
+      try {
+        await ChatRepository.saveConversation({
+          id: threadId,
+          title: generatedTitle,
+          created_at: Date.now(),
+          is_synced: false,
+          server_id: undefined
+        });
+      } catch (err) {
+        console.error("Failed save local chat:", err);
       }
     }
 
@@ -571,18 +676,18 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     }));
     setInput("");
 
-    // Persistence
-    if (isOffline) {
-      try {
-        await ChatRepository.saveMessage({
-          conversation_id: threadId,
-          role: 'user',
-          content: text,
-          is_synced: false
-        });
-      } catch (e) {
-        console.warn("User message local save failed:", e);
-      }
+    // Persistence: ALWAYS save user message locally first as fallback
+    let localUserMsgId = "";
+    try {
+      const savedMsg = await ChatRepository.saveMessage({
+        conversation_id: threadId,
+        role: 'user',
+        content: text,
+        is_synced: false
+      });
+      localUserMsgId = savedMsg.id;
+    } catch (e) {
+      console.warn("User message local save failed:", e);
     }
 
     const wsOk = await ws.send(text, threadId);
@@ -615,16 +720,24 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
           threadId = realId;
           setActiveConversationId(realId);
 
+          // Crucial: Update SQLite so the temporary ID is fully converted to the Real ID
+          // otherwise it will be unrecoverable through activeConversationId on offline reload
+          await ChatRepository.replaceConversationId(oldTempId, realId);
+
           api.renameConversation(realId, generatedTitle).catch(err => {
             console.warn("[ChatContext] Failed renaming on server:", err);
           });
-          api.saveMessage(realId, "user", text).catch(() => { });
+          api.saveMessage(realId, "user", text).then(() => {
+             if (localUserMsgId) ChatRepository.markMessageSynced(localUserMsgId, "synced");
+          }).catch(() => { });
         }
       } catch (e) {
         console.error("Failed to create real conversation:", e);
       }
     } else if (!isNewChat && !isOffline) {
-      api.saveMessage(threadId, "user", text).catch(() => { });
+      api.saveMessage(threadId, "user", text).then(() => {
+         if (localUserMsgId) ChatRepository.markMessageSynced(localUserMsgId, "synced");
+      }).catch(() => { });
 
       setConversations((prev) => {
         const targetIdx = prev.findIndex(c => c.id === threadId);
@@ -654,6 +767,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const handleDeleteConversation = useCallback(async (id: string) => {
+    deletedConvsRef.current.add(id);
     try {
       if (isInternetReachable && !id.startsWith("temp-")) {
         await api.deleteConversation(id);
@@ -707,8 +821,8 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
       if (isInternetReachable) {
         await api.clearAllChats();
       }
-      await ChatRepository.deleteSyncedConversations();
-      await ChatRepository.deleteSyncedMessages();
+      // Wipe everything locally to match backend empty state
+      await ChatRepository.wipeAllLocalData();
 
       setConversations([]);
       setMessagesByConversation({});

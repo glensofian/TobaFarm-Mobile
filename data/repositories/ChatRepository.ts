@@ -23,9 +23,9 @@ export const ChatRepository = {
     const db = await getDatabase();
     console.log(`[ChatRepository] saveConversation: id=${conv.id}, title=${conv.title}`);
     await db.runAsync(
-      `INSERT INTO conversations (id, title, created_at, is_synced, server_id) 
+      `INSERT OR REPLACE INTO conversations (id, title, created_at, is_synced, server_id) 
        VALUES (?, ?, ?, ?, ?)`,
-      conv.id, conv.title, conv.created_at || Date.now(), conv.is_synced ? 1 : 0, conv.server_id || null
+      conv.id, conv.title, conv.created_at || Date.now(), conv.is_synced ? 1 : 0, conv.server_id || ""
     );
   },
 
@@ -38,13 +38,11 @@ export const ChatRepository = {
     return row ? parseConversationRow(row) : null;
   },
 
-  // Returns only unsynced (local-only) conversations.
-  // Synced conversations are fetched directly from the API.
-  async getAllConversations(limit = 20): Promise<Conversation[]> {
+  // Returns all local conversations (both synced and unsynced) so they are available offline.
+  async getAllConversations(limit = 200): Promise<Conversation[]> {
     const db = await getDatabase();
     const rows = await db.getAllAsync(
       `SELECT * FROM conversations 
-       WHERE is_synced = 0
        ORDER BY created_at DESC 
        LIMIT ?`,
       limit
@@ -82,32 +80,51 @@ export const ChatRepository = {
     );
   },
 
+  async replaceConversationId(oldId: string, newId: string): Promise<void> {
+    const db = await getDatabase();
+    const old = await db.getFirstAsync<any>('SELECT * FROM conversations WHERE id = ?', oldId);
+    if (old) {
+      await db.runAsync(
+        `INSERT OR REPLACE INTO conversations (id, title, created_at, is_synced, server_id) 
+         VALUES (?, ?, ?, ?, ?)`,
+        newId, old.title, old.created_at, 1, newId
+      );
+      await this.updateMessagesConversationId(oldId, newId);
+      await db.runAsync(`DELETE FROM conversations WHERE id = ?`, oldId);
+    }
+  },
+
   // ========== MESSAGES ==========
 
-  async saveMessage(message: Omit<Message, 'id' | 'created_at'>): Promise<Message> {
+  async saveMessage(message: Omit<Message, 'id' | 'created_at'> & { id?: string, created_at?: number }): Promise<Message> {
     const db = await getDatabase();
-    const id = generateId();
-    const now = Date.now();
+    const id = message.id || generateId();
+    const now = message.created_at || Date.now();
     
     console.log(`[ChatRepository] saveMessage: role=${message.role}, conversation_id=${message.conversation_id}`);
     
     // Quick verify parents exists
     const parent = await db.getFirstAsync('SELECT id FROM conversations WHERE id = ?', message.conversation_id);
     if (!parent) {
-      console.error(`[CRITICAL] saveMessage failed: Parent conversation ${message.conversation_id} NOT FOUND in database!`);
+      console.warn(`[WARNING] saveMessage: Parent conversation ${message.conversation_id} NOT FOUND in database! Creating stub.`);
+      await db.runAsync(
+        `INSERT OR REPLACE INTO conversations (id, title, created_at, is_synced, server_id) 
+         VALUES (?, ?, ?, ?, ?)`,
+        message.conversation_id, 'Restored Chat', Date.now(), 1, message.conversation_id
+      );
     }
 
     await db.runAsync(
-      `INSERT INTO messages (id, conversation_id, role, content, metadata, created_at, is_synced, server_id) 
+      `INSERT OR REPLACE INTO messages (id, conversation_id, role, content, metadata, created_at, is_synced, server_id) 
        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       id,
       message.conversation_id,
       message.role,
       message.content,
-      message.metadata ? JSON.stringify(message.metadata) : null,
+      message.metadata ? JSON.stringify(message.metadata) : "",
       now,
       message.is_synced ? 1 : 0,
-      message.server_id || null
+      message.server_id || ""
     );
     
     return { id, created_at: now, ...message };
@@ -137,7 +154,7 @@ export const ChatRepository = {
     const db = await getDatabase();
     await db.runAsync(
       `UPDATE messages SET is_synced = 1, server_id = ? WHERE id = ?`,
-      serverId, localId
+      serverId || "", localId
     );
   },
 
@@ -172,6 +189,23 @@ export const ChatRepository = {
     const db = await getDatabase();
     const result = await db.runAsync(`DELETE FROM conversations WHERE is_synced = 1`);
     return result.changes;
+  },
+
+  // Completely erase all conversations and messages locally
+  async wipeAllLocalData(): Promise<void> {
+    const db = await getDatabase();
+    await db.runAsync(`DELETE FROM messages`);
+    await db.runAsync(`DELETE FROM conversations`);
+    console.log("Local SQLite database wiped successfully.");
+  },
+
+  // Save space: purge synced messages of conversations other than the active one
+  async purgeOldSyncedMessages(activeConversationId: string): Promise<void> {
+    const db = await getDatabase();
+    await db.runAsync(
+      `DELETE FROM messages WHERE is_synced = 1 AND conversation_id != ?`,
+      activeConversationId
+    );
   },
 
   // ========== SYNC UTILITIES ===========
