@@ -28,6 +28,7 @@ import { getValueFor, removeValueFor, save } from '@/utils/storage';
 import { uid } from '@/utils/uid';
 import { MODEL_CONFIG } from '../constants/modelConfig';
 import { models } from '../constants/models';
+import { isDownloadingModel, cancelDownload, consumeNetworkAborted } from '../utils/modelDownloader';
 import { ChatRepository } from '../data/repositories/ChatRepository';
 import { loadKnowledgeBase } from '../utils/knowledgeLoader';
 import { LlamaRNWrapper } from '../utils/LlamaRNWrapper';
@@ -315,7 +316,15 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     }
 
     if (isInternetReachable === false && prevInternetReachable.current === true) {
-      if (isOfflineModelDownloaded) {
+      if (isDownloadingModel() || consumeNetworkAborted()) {
+        cancelDownload(); // Membatalkan semua proses background/native
+        setDownloadModelVisible(false); // Tutup modal
+
+        setNotification({
+          title: (t.roomChat as any).downloadFailedTitle || 'Download Terhenti',
+          message: (t.roomChat as any).downloadNetworkError || 'Proses download Anda terhenti dikarenakan putus koneksi. Periksa jaringan Anda untuk melanjutkannya!',
+        });
+      } else if (isOfflineModelDownloaded) {
         setSelectedModelRaw('tofa-offline');
         setNotification({
           title: (t.roomChat as any).offlineSwitchTitle || "Mode Offline",
