@@ -50,20 +50,19 @@ export const useSyncChat = ({ user, isInternetReachable }: SyncParams) => {
       // Sync Messages
       const unsyncedMsgs = await ChatRepository.getUnsyncedMessages();
       for (const msg of unsyncedMsgs) {
+        let parentConv = null;
         try {
           // Get the server_id of the parent conversation
-          const parentConv = await ChatRepository.getConversation(
+          parentConv = await ChatRepository.getConversation(
             msg.conversation_id,
           );
 
           if (parentConv && parentConv.server_id) {
-            if (msg.role === "assistant" || (msg as any).role === "bot") {
-              await ChatRepository.markMessageSynced(msg.id, "synced");
-              continue;
-            }
+            // Removed logic that skips syncing assistant messages
+            // Now both user and assistant messages will be pushed to API
 
             console.log(`Syncing message: ${msg.id.substring(0, 8)}...`);
-            const apiRole: "user" | "assistant" = "user";
+            const apiRole = (msg.role === "assistant" || (msg as any).role === "bot") ? "assistant" : "user";
 
             await api.saveMessage(
               parentConv.server_id,
@@ -79,14 +78,33 @@ export const useSyncChat = ({ user, isInternetReachable }: SyncParams) => {
               `Cannot sync message ${msg.id}: Parent conversation not synced yet.`,
             );
           }
-        } catch (err) {
-          console.error(`Failed to sync message ${msg.id}:`, err);
+        } catch (err: any) {
+          if (err.response && err.response.status === 404 && parentConv) {
+            console.warn(`Parent conversation ${parentConv.server_id} not found on server (404). Re-creating it...`);
+            try {
+              const newConv = await api.createConversation();
+              if (newConv && newConv.id) {
+                await ChatRepository.markConversationSynced(parentConv.id, newConv.id);
+                if (parentConv.title && parentConv.title !== "Percakapan Baru") {
+                  await api.renameConversation(newConv.id, parentConv.title).catch(() => {});
+                }
+                const apiRole = (msg.role === "assistant" || (msg as any).role === "bot") ? "assistant" : "user";
+                await api.saveMessage(newConv.id, apiRole, msg.content);
+                await ChatRepository.markMessageSynced(msg.id, "synced");
+                console.log(`Message synced after parent recreation: ${msg.id}`);
+              }
+            } catch (recreateErr) {
+               console.error(`Failed to re-create parent conversation and sync message ${msg.id}:`, recreateErr);
+            }
+          } else {
+            console.error(`Failed to sync message ${msg.id}:`, err);
+          }
         }
       }
 
-      // Cleanup: Remove synced messages from local SQLite.
-      const deletedMsgs = await ChatRepository.deleteSyncedMessages();
-      console.log(`✨ Chat sync completed. Removed ${deletedMsgs} synced messages. (Conversations preserved locally)`);
+      // Cleanup: We no longer remove synced messages from local SQLite so they serve as offline cache.
+      // const deletedMsgs = await ChatRepository.deleteSyncedMessages();
+      console.log(`✨ Chat sync completed. Data is preserved locally for offline access.`);
     } catch (err: any) {
       setLastError(err.message || "Sync failed");
       console.error("Sync error:", err);

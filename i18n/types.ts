@@ -37,6 +37,14 @@ export interface RoomChatTranslation {
   login: string;
   noInternet: string;
   checkConnection: string;
+  modelAnsweringTitle: string;
+  modelAnsweringMessage: string;
+  offlineSwitchTitle: string;
+  offlineSwitchMessage: string;
+  offlineNotDownloadedTitle: string;
+  offlineNotDownloadedMessage: string;
+  onlineSwitchTitle: string;
+  onlineSwitchMessage: string;
 }
 
 export interface SettingsTranslation {

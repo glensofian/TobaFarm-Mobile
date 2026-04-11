@@ -351,7 +351,16 @@ function RoomChatInner() {
         onClose={() => setDownloadModelVisible(false)}
         onDownloadSuccess={() => {
           checkOfflineModel();
-          setDownloadModelVisible(false);
+          setNotification({ 
+            title: (t.roomChat as any).downloadReady || 'Model Siap', 
+            message: (t.roomChat as any).downloadReadyMsg || 'Model telah berhasil diunduh dan siap digunakan.' 
+          });
+        }}
+        onDownloadFailed={(errorMsg) => {
+          setNotification({ 
+            title: (t.roomChat as any).downloadFailedTitle || 'Download Terhenti', 
+            message: errorMsg 
+          });
         }}
       />
     </SafeAreaView>

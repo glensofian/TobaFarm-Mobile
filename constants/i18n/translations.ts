@@ -32,6 +32,9 @@ export type Translation = {
   oldPasswordPlaceholder: string;
   newPasswordPlaceholder: string;
   confirmPasswordPlaceholder: string;
+
+  modelAnsweringTitle: string;
+  modelAnsweringMessage: string;
 };
 
 export const translations: Record<Lang, Translation> = {
@@ -65,6 +68,8 @@ export const translations: Record<Lang, Translation> = {
     oldPasswordPlaceholder: "Masukkan kata sandi lama",
     newPasswordPlaceholder: "Masukkan kata sandi baru",
     confirmPasswordPlaceholder: "Konfirmasi kata sandi baru",
+    modelAnsweringTitle: "Sedang Menjawab",
+    modelAnsweringMessage: "sedang menjawab, harap tunggu hingga selesai.",
   },
   en: {
     settings: "Settings",
@@ -96,5 +101,7 @@ export const translations: Record<Lang, Translation> = {
     oldPasswordPlaceholder: "Enter old password",
     newPasswordPlaceholder: "Enter new password",
     confirmPasswordPlaceholder: "Confirm new password",
+    modelAnsweringTitle: "Answering",
+    modelAnsweringMessage: "is answering, please wait until finished.",
   },
 };

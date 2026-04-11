@@ -22,6 +22,7 @@ import {
 } from "../styles";
 import { getValueFor } from "../utils/storage";
 import { createConversationsApi } from "../api/conversationsApi";
+import { ChatRepository } from "../data/repositories/ChatRepository";
 
 export default function Home() {
   const router = useRouter();
@@ -43,8 +44,15 @@ export default function Home() {
           setUsername(userData.username);
 
           const api = createConversationsApi();
-          const conversations = await api.loadConversations();
-          if (conversations.length > 0) {
+          let convList: any[] = [];
+          try {
+            convList = await api.loadConversations();
+          } catch (apiErr) {
+            console.log("Koneksi gagal, membaca percakapan dari SQLite (offline)");
+            convList = await ChatRepository.getAllConversations();
+          }
+
+          if (convList.length > 0) {
             console.log("Riwayat chat ditemukan, otomatis masuk ke RoomChat...");
             router.replace("/roomchat");
           }
